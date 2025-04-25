@@ -1,0 +1,327 @@
+document.addEventListener('DOMContentLoaded', () => {
+
+
+  const steps   = [...document.querySelectorAll('.step')];
+  let   current = 1;
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  function show(n) {
+    steps.forEach(s => s.classList.remove('active'));
+    document.querySelector(`.step[data-step="${n}"]`).classList.add('active');
+    prevBtn.style.display = n===1 ? 'none' : '';
+    nextBtn.textContent  = n===5 ? 'Generar y Guardar' : 'Siguiente';
+  }
+  prevBtn.onclick = () => { if (current>1) show(--current); };
+  nextBtn.onclick = () => {
+    if (current<5) show(++current);
+    else generatePoster();
+  };
+  show(current);
+
+  // — Globals —
+  let img = null, pagesX=1, pagesY=1, cropper=null;
+  const fileIn   = document.getElementById('imageInput');
+  const imgPrev  = document.getElementById('imgPreview');
+  const cropBtn  = document.getElementById('cropBtn');
+  const sheetSz  = document.getElementById('sheetSize');
+  const orient   = document.getElementById('orientation');
+  const mT       = document.getElementById('marginTop');
+  const mL       = document.getElementById('marginLeft');
+  const mR       = document.getElementById('marginRight');
+  const mB       = document.getElementById('marginBottom');
+  const resetM   = document.getElementById('resetMarginsBtn');
+  const oW       = document.getElementById('overlapWidth');
+  const oH       = document.getElementById('overlapHeight');
+  const posBtns  = document.querySelectorAll('[data-pos]');
+  const axisRad  = [...document.getElementsByName('axis')];
+  const pXIn     = document.getElementById('pagesX');
+  const pYIn     = document.getElementById('pagesY');
+  const incBtns  = document.querySelectorAll('.inc');
+  const resLab   = document.getElementById('resultLabel');
+  const showG    = document.getElementById('showGuides');
+  const showO    = document.getElementById('showOverlap');
+  const openChk  = document.getElementById('openPdf');
+  const cMargin  = document.getElementById('marginCanvas');
+  const cOver    = document.getElementById('overlapCanvas');
+  const cPrev    = document.getElementById('previewCanvas');
+  const ctxM     = cMargin.getContext('2d');
+  const ctxO     = cOver.getContext('2d');
+  const ctxP     = cPrev.getContext('2d');
+
+  const sheets = {
+    letter: { w:216, h:279 },
+    A4:     { w:210, h:297 },
+    tabloid:{ w:279, h:432 }
+  };
+
+
+  // – Paso 1:
+  fileIn.onchange = () => {
+    const f = fileIn.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const url = e.target.result;
+      imgPrev.src = url;
+      // init Cropper
+      if (cropper) cropper.destroy();
+      cropper = new Cropper(imgPrev, {
+        viewMode: 1, autoCropArea: 1,
+        background: false, movable: true, zoomable: true
+      });
+      // pre-asigna img para preview
+      img = new Image();
+      img.onload = () => {
+        drawMargin();
+        drawOverlap();
+        drawPreview();
+      };
+      img.src = url;
+    };
+    reader.readAsDataURL(f);
+  };
+
+
+  // – Paso 1b: cut –
+
+  cropBtn.onclick = () => {
+    if (!cropper) return;
+    const canvasCrop = cropper.getCroppedCanvas();
+    const url        = canvasCrop.toDataURL('image/png');
+    cropper.destroy();
+    cropper = null;
+    imgPrev.src = url;
+    img = new Image();
+    img.onload = () => {
+      drawMargin();
+      drawOverlap();
+      drawPreview();
+    };
+    img.src = url;
+  };
+
+
+  // – Paso 2
+
+  resetM.onclick = () => {
+    mT.value = mL.value = mR.value = mB.value = 0;
+    drawMargin();
+    drawPreview();
+  };
+
+
+  // – Paso 2: Preview 
+
+  function drawMargin(){
+    const {w:sw0,h:sh0} = sheets[sheetSz.value];
+    let sw=sw0, sh=sh0;
+    if (orient.value==='landscape') [sw,sh]=[sh,sw];
+    const sx = cMargin.width/sw, sy = cMargin.height/sh;
+    const mt = +mT.value*10, ml = +mL.value*10,
+          mr = +mR.value*10, mb = +mB.value*10;
+    ctxM.clearRect(0,0,cMargin.width,cMargin.height);
+    ctxM.fillStyle='rgba(255,0,0,0.3)';
+    ctxM.fillRect(0,0,cMargin.width, mt*sy);
+    ctxM.fillRect(0,cMargin.height-mb*sy, cMargin.width, mb*sy);
+    ctxM.fillRect(0,0, ml*sx, cMargin.height);
+    ctxM.fillRect(cMargin.width-mr*sx,0, mr*sx, cMargin.height);
+  }
+
+  // – Paso 3: Preview solapado –
+
+  let overlapPos='top-left';
+  posBtns.forEach(b=>{
+    b.onclick = () => { overlapPos = b.dataset.pos; drawOverlap(); };
+  });
+  function drawOverlap(){
+    const {w:sw0,h:sh0} = sheets[sheetSz.value];
+    let sw=sw0, sh=sh0;
+    if (orient.value==='landscape') [sw,sh]=[sh,sw];
+    const sx = cOver.width/sw, sy = cOver.height/sh;
+    const ow = +oW.value*10, oh = +oH.value*10;
+    ctxO.clearRect(0,0,cOver.width,cOver.height);
+    ctxO.fillStyle='rgba(255,0,0,0.3)';
+    if (overlapPos.includes('top'))
+      ctxO.fillRect(0,0,cOver.width, oh*sy);
+    if (overlapPos.includes('bottom'))
+      ctxO.fillRect(0,cOver.height-oh*sy, cOver.width, oh*sy);
+    if (overlapPos.includes('left'))
+      ctxO.fillRect(0,0, ow*sx, cOver.height);
+    if (overlapPos.includes('right'))
+      ctxO.fillRect(cOver.width-ow*sx,0, ow*sx, cOver.height);
+  }
+
+  // – Paso 4:
+
+  axisRad.forEach(r => r.addEventListener('change', drawPreview));
+  function drawPreview(){
+    if (!img) return;
+    const {w:sw0,h:sh0} = sheets[sheetSz.value];
+    let sw=sw0, sh=sh0;
+    if (orient.value==='landscape') [sw,sh]=[sh,sw];
+    const overlapW = +oW.value*10,
+          overlapH = +oH.value*10;
+
+    
+    const axis = document.querySelector('input[name="axis"]:checked').value;
+    if (axis==='x') {
+      pagesX = Math.max(1, +pXIn.value);
+      const totalWmm = pagesX*sw - overlapW*(pagesX-1);
+      const totalHmm = totalWmm * (img.naturalHeight/img.naturalWidth);
+      pagesY = Math.max(1, Math.ceil((totalHmm + overlapH)/sh));
+    } else {
+      pagesY = Math.max(1, +pYIn.value);
+      const totalHmm = pagesY*sh - overlapH*(pagesY-1);
+      const totalWmm = totalHmm * (img.naturalWidth/img.naturalHeight);
+      pagesX = Math.max(1, Math.ceil((totalWmm + overlapW)/sw));
+    }
+    pXIn.value = pagesX;
+    pYIn.value = pagesY;
+    resLab.textContent = `Páginas: ${pagesX}×${pagesY}`;
+
+
+    const totalWmm = pagesX*sw - overlapW*(pagesX-1);
+    const totalHmm = pagesY*sh - overlapH*(pagesY-1);
+    const PREV_W = 400;
+    const PREV_H = Math.round(PREV_W * totalHmm / totalWmm);
+    cPrev.width  = PREV_W;
+    cPrev.height = PREV_H;
+
+
+    const tileW = PREV_W/pagesX,
+          tileH = PREV_H/pagesY;
+    const ppmX  = img.naturalWidth/totalWmm,
+          ppmY  = img.naturalHeight/totalHmm;
+
+
+    ctxP.clearRect(0,0,PREV_W,PREV_H);
+    for (let y=0; y<pagesY; y++){
+      for (let x=0; x<pagesX; x++){
+        const sxMm = x*(sw-overlapW),
+              syMm = y*(sh-overlapH),
+              swMm = sw + (x>0?overlapW:0)+(x<pagesX-1?overlapW:0),
+              shMm = sh + (y>0?overlapH:0)+(y<pagesY-1?overlapH:0);
+        const sxPx = sxMm*ppmX,
+              syPx = syMm*ppmY,
+              sWPx = swMm*ppmX,
+              sHPx = shMm*ppmY;
+        ctxP.drawImage(
+          img,
+          sxPx, syPx, sWPx, sHPx,
+          x*tileW, y*tileH, tileW, tileH
+        );
+      }
+    }
+
+
+    // 5) Cuadrícula
+    ctxP.save();
+    ctxP.strokeStyle='#007bff';
+    ctxP.setLineDash([4,2]);
+    for(let i=1;i<pagesX;i++){
+      const X=i*tileW;
+      ctxP.beginPath(); ctxP.moveTo(X,0); ctxP.lineTo(X,PREV_H); ctxP.stroke();
+    }
+    for(let j=1;j<pagesY;j++){
+      const Y=j*tileH;
+      ctxP.beginPath(); ctxP.moveTo(0,Y); ctxP.lineTo(PREV_W,Y); ctxP.stroke();
+    }
+    ctxP.restore();
+
+    // 6) Solapado
+    if (showO.checked){
+      const owPx = overlapW/sw*tileW,
+            ohPx = overlapH/sh*tileH;
+      ctxP.save();
+      ctxP.fillStyle='rgba(255,0,0,0.3)';
+      for(let i=1;i<pagesX;i++){
+        const X=i*tileW - owPx/2;
+        ctxP.fillRect(X,0,owPx,PREV_H);
+      }
+      for(let j=1;j<pagesY;j++){
+        const Y=j*tileH - ohPx/2;
+        ctxP.fillRect(0,Y,PREV_W,ohPx);
+      }
+      ctxP.restore();
+    }
+  }
+
+
+
+  incBtns.forEach(b=>{
+    b.onclick = ()=>{
+      const t = document.getElementById(b.dataset.target);
+      let   v = +t.value;
+      v = b.dataset.op==='+'? v+1 : Math.max(1,v-1);
+      t.value = v;
+      drawPreview();
+    };
+  });
+
+
+
+
+  [
+    sheetSz, orient,
+    mT,mL,mR,mB,
+    oW,oH,
+    ...axisRad,
+    pXIn,pYIn,
+    showG,showO
+  ].forEach(el=> el.addEventListener('input', ()=>{
+    drawMargin();
+    drawOverlap();
+    drawPreview();
+  }));
+
+
+
+  // — Paso 5: PDF —
+
+  async function generatePoster(){
+    if (!img) return alert('Primero carga y recorta una imagen');
+    drawPreview();
+    try {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        unit:'mm',
+        format:[ sheets[sheetSz.value].w, sheets[sheetSz.value].h ],
+        orientation: orient.value
+      });
+      let idx=0;
+      for(let y=0;y<pagesY;y++){
+        for(let x=0;x<pagesX;x++){
+          if (idx++) pdf.addPage();
+          const sx = x*(sheets[sheetSz.value].w - +oW.value*10),
+                sy = y*(sheets[sheetSz.value].h - +oH.value*10);
+          pdf.addImage(img.src,'PNG',
+                       -sx, -sy,
+                       pagesX * sheets[sheetSz.value].w,
+                       pagesY * sheets[sheetSz.value].h);
+          if (showG.checked){
+            pdf.setLineDash([3,3],0);
+            pdf.setDrawColor(255,0,0);
+            pdf.rect(0,0,
+                     sheets[sheetSz.value].w,
+                     sheets[sheetSz.value].h);
+          }
+          if (showO.checked){
+            if(x>0) pdf.addImage(img.src,'PNG',
+                                 -sx+ +oW.value*10, -sy,
+                                 pagesX * sheets[sheetSz.value].w,
+                                 pagesY * sheets[sheetSz.value].h);
+            if(y>0) pdf.addImage(img.src,'PNG',
+                                 -sx, -sy+ +oH.value*10,
+                                 pagesX * sheets[sheetSz.value].w,
+                                 pagesY * sheets[sheetSz.value].h);
+          }
+          idx++;
+        }
+      }
+      pdf.save('poster.pdf');
+      if (openChk.checked) window.open(pdf.output('bloburl'));
+    } catch(err){
+      alert('Error generando PDF: '+err.message);
+    }
+  }
+});

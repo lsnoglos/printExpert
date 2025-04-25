@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PrintExpert 🖶</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"
+    rel="stylesheet"/>
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js">
+  </script>
+</head>
+
+<body>
+  <header><h1>PrintExpert 🖶</h1></header>
+
+  <main>
+    <form id="wizardForm">
+
+      <!-- Paso 1 -->
+      <div class="step active" data-step="1">
+        <h2>Paso 1 / 5: Cargar y recortar imagen</h2>
+        <div class="form-group">
+          <label>Imagen de entrada:</label>
+          <input type="file" id="imageInput" accept="image/*" />
+        </div>
+        <div class="form-group">
+          <label>Vista previa (recorta con el ratón):</label>
+          <div class="crop-container">
+            <img id="imgPreview" style="max-width:100%; display:block;" />
+          </div>
+          <button type="button" id="cropBtn">Recortar selección</button>
+        </div>
+      </div>
+
+      <!-- Paso 2 -->
+      <div class="step" data-step="2">
+        <h2>Paso 2 / 5: Formato y márgenes</h2>
+        <div class="form-group">
+          <label>Formato de papel:</label>
+          <select id="sheetSize">
+            <option value="letter">Carta – 216×279 mm</option>
+            <option value="A4">A4 – 210×297 mm</option>
+            <option value="tabloid">Tabloide – 279×432 mm</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Orientación:</label>
+          <select id="orientation">
+            <option value="portrait">Vertical</option>
+            <option value="landscape">Horizontal</option>
+          </select>
+        </div>
+        <fieldset>
+          <legend>Márgenes (cm)</legend>
+          <div class="form-group">
+            <label>Superior <input type="number" id="marginTop" value="1.5" step="0.1" min="0"/></label>
+          </div>
+          <div class="form-group">
+            <label>Izquierdo <input type="number" id="marginLeft" value="1.5" step="0.1" min="0"/></label>
+          </div>
+          <div class="form-group">
+            <label>Derecho <input type="number" id="marginRight" value="1.5" step="0.1" min="0"/></label>
+          </div>
+          <div class="form-group">
+            <label>Inferior <input type="number" id="marginBottom" value="1.5" step="0.1" min="0"/></label>
+          </div>
+          <div class="form-group">
+            <button type="button" id="resetMarginsBtn">Sin márgenes</button>
+          </div>
+        </fieldset>
+        <div class="form-group">
+          <label>Vista previa márgenes:</label>
+          <canvas id="marginCanvas" width="200" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- Paso 3 -->
+      <div class="step" data-step="3">
+        <h2>Paso 3 / 5: Parámetros de solapado</h2>
+        <div class="form-group">
+          <label>Ancho solapado (cm):</label>
+          <input type="number" id="overlapWidth" value="1" step="0.1" min="0"/>
+        </div>
+        <div class="form-group">
+          <label>Alto solapado (cm):</label>
+          <input type="number" id="overlapHeight" value="1" step="0.1" min="0"/>
+        </div>
+        <div class="form-group">
+          <label>Posición de solapado:</label>
+          <div class="position-grid">
+            <button type="button" data-pos="top-left">Superior izq</button>
+            <button type="button" data-pos="top-right">Superior der</button>
+            <button type="button" data-pos="bottom-left">Inferior izq</button>
+            <button type="button" data-pos="bottom-right">Inferior der</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Vista previa solapado:</label>
+          <canvas id="overlapCanvas" width="200" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- Paso 4 -->
+      <div class="step" data-step="4">
+        <h2>Paso 4 / 5: Dimensiones por hojas</h2>
+
+        <div class="form-group">
+          <label>Ajustar por:</label><br/>
+          <label><input type="radio" name="axis" value="x" checked/> Hojas horizontalmente</label><br/>
+          <label><input type="radio" name="axis" value="y"/> Hojas verticalmente</label>
+        </div>
+
+        <div class="form-group">
+          <div class="inc-controls">
+            <button type="button" class="inc" data-target="pagesX" data-op="-">−</button>
+            <input type="number" id="pagesX" value="1" min="1"/>
+            <button type="button" class="inc" data-target="pagesX" data-op="+">+</button>
+            <label for="pagesX">Hojas horiz.</label>
+          </div>
+          <div class="inc-controls">
+            <button type="button" class="inc" data-target="pagesY" data-op="-">−</button>
+            <input type="number" id="pagesY" value="1" min="1"/>
+            <button type="button" class="inc" data-target="pagesY" data-op="+">+</button>
+            <label for="pagesY">Hojas vert.</label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Resultado:</label>
+          <div id="resultLabel" class="result-box">—</div>
+        </div>
+
+        <canvas id="previewCanvas" width="400" height="0"></canvas>
+      </div>
+
+      <!-- Paso 5 -->
+      <div class="step" data-step="5">
+        <h2>Paso 5 / 5: Guardar póster</h2>
+        <div class="form-group">
+          <label><input type="checkbox" id="showGuides" checked/> Mostrar líneas guía</label>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="showOverlap" checked/> Mostrar solapado</label>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="openPdf" checked/> Abrir PDF tras generar</label>
+        </div>
+      </div>
+
+      <!---->
+      <div class="wizard-nav">
+        <button type="button" id="prevBtn">Atrás</button>
+        <button type="button" id="nextBtn">Siguiente</button>
+      </div>
+    </form>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
