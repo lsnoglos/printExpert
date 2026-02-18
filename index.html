@@ -19,9 +19,8 @@
   <main>
     <form id="wizardForm">
 
-      <!-- Paso 1 -->
       <div class="step active" data-step="1">
-        <h2>Paso 1 / 5: Cargar y recortar imagen</h2>
+        <h2>Paso 1 / 4: Cargar y recortar imagen</h2>
         <div class="form-group">
           <label>Imagen de entrada:</label>
           <input type="file" id="imageInput" accept="image/*" />
@@ -35,9 +34,8 @@
         </div>
       </div>
 
-      <!-- Paso 2 -->
       <div class="step" data-step="2">
-        <h2>Paso 2 / 5: Formato y márgenes</h2>
+        <h2>Paso 2 / 4: Formato, márgenes y entrelace</h2>
         <div class="form-group">
           <label>Formato de papel:</label>
           <select id="sheetSize">
@@ -46,62 +44,37 @@
             <option value="tabloid">Tabloide – 279×432 mm</option>
           </select>
         </div>
+
         <fieldset>
           <legend>Márgenes (cm)</legend>
-          <div class="form-group inline-checks">
+          <div class="form-group inline-checks compact-checks">
             <label class="inline-check"><input type="checkbox" id="linkMargins"/> Todos iguales</label>
           </div>
-          <div class="form-group">
+          <div class="row-fields">
             <label>Superior <input type="number" id="marginTop" value="0" step="0.1" min="0"/></label>
-          </div>
-          <div class="form-group">
             <label>Izquierdo <input type="number" id="marginLeft" value="0" step="0.1" min="0"/></label>
-          </div>
-          <div class="form-group">
             <label>Derecho <input type="number" id="marginRight" value="0" step="0.1" min="0"/></label>
-          </div>
-          <div class="form-group">
             <label>Inferior <input type="number" id="marginBottom" value="0" step="0.1" min="0"/></label>
           </div>
           <div class="form-group">
             <button type="button" id="resetMarginsBtn">Sin márgenes</button>
           </div>
         </fieldset>
-        <div class="form-group">
-          <label>Vista previa márgenes:</label>
-          <canvas id="marginCanvas" width="200" height="200"></canvas>
-        </div>
-      </div>
 
-      <!-- Paso 3 -->
-      <div class="step" data-step="3">
-        <h2>Paso 3 / 5: Parámetros de solapado</h2>
-        <div class="form-group">
-          <label>Ancho solapado (cm):</label>
-          <input type="number" id="overlapWidth" value="1" step="0.1" min="0"/>
-        </div>
-        <div class="form-group">
-          <label>Alto solapado (cm):</label>
-          <input type="number" id="overlapHeight" value="1" step="0.1" min="0"/>
-        </div>
-        <div class="form-group">
-          <label>Posición de solapado:</label>
-          <div class="position-grid">
-            <button type="button" data-pos="top-left">Superior izq</button>
-            <button type="button" data-pos="top-right">Superior der</button>
-            <button type="button" data-pos="bottom-left">Inferior izq</button>
-            <button type="button" data-pos="bottom-right">Inferior der</button>
+        <fieldset>
+          <legend>Entrelace / solapado (cm)</legend>
+          <div class="row-fields">
+            <label>Ancho <input type="number" id="overlapWidth" value="1" step="0.1" min="0"/></label>
+            <label>Alto <input type="number" id="overlapHeight" value="1" step="0.1" min="0"/></label>
           </div>
-        </div>
-        <div class="form-group">
-          <label>Vista previa solapado:</label>
-          <canvas id="overlapCanvas" width="200" height="200"></canvas>
-        </div>
+          <div class="form-group inline-checks compact-checks">
+            <label class="inline-check"><input type="checkbox" id="blankOverlap"/> Reservar entrelace en blanco (sin fragmento de imagen duplicado)</label>
+          </div>
+        </fieldset>
       </div>
 
-      <!-- Paso 4 -->
-      <div class="step" data-step="4">
-        <h2>Paso 4 / 5: Dimensiones por hojas</h2>
+      <div class="step" data-step="3">
+        <h2>Paso 3 / 4: Dimensiones por hojas y vista previa</h2>
 
         <div class="form-group">
           <label>Orientación de hoja:</label>
@@ -115,14 +88,14 @@
           <div class="inc-controls">
             <button type="button" class="inc" data-target="pagesX" data-op="-">−</button>
             <input type="number" id="pagesX" value="1" min="1"/>
-            <button type="button" class="inc" data-target="pagesX" data-op="+">+</button>
             <label for="pagesX">Hojas horiz.</label>
+            <button type="button" class="inc" data-target="pagesX" data-op="+">+</button>
           </div>
           <div class="inc-controls">
             <button type="button" class="inc" data-target="pagesY" data-op="-">−</button>
             <input type="number" id="pagesY" value="1" min="1"/>
-            <button type="button" class="inc" data-target="pagesY" data-op="+">+</button>
             <label for="pagesY">Hojas vert.</label>
+            <button type="button" class="inc" data-target="pagesY" data-op="+">+</button>
           </div>
         </div>
 
@@ -131,7 +104,7 @@
           <div id="resultLabel" class="result-box">—</div>
         </div>
 
-        <div class="form-group inline-checks">
+        <div class="form-group inline-checks compact-checks">
           <label class="inline-check"><input type="checkbox" id="keepAspect" checked/> Mantener proporción</label>
         </div>
 
@@ -149,21 +122,19 @@
         <canvas id="previewCanvas" width="400" height="0"></canvas>
       </div>
 
-      <!-- Paso 5 -->
-      <div class="step" data-step="5">
-        <h2>Paso 5 / 5: Guardar póster</h2>
-        <div class="form-group">
-          <label><input type="checkbox" id="showGuides" checked/> Mostrar líneas guía</label>
+      <div class="step" data-step="4">
+        <h2>Paso 4 / 4: Guardar póster</h2>
+        <div class="form-group inline-checks compact-checks">
+          <label class="inline-check"><input type="checkbox" id="showGuides" checked/> Mostrar líneas guía (entrelace: verde / márgenes: rojo)</label>
         </div>
-        <div class="form-group">
-          <label><input type="checkbox" id="showOverlap" checked/> Mostrar solapado</label>
+        <div class="form-group inline-checks compact-checks">
+          <label class="inline-check"><input type="checkbox" id="showOverlap" checked/> Mostrar zonas de entrelace en la vista previa/PDF</label>
         </div>
-        <div class="form-group">
-          <label><input type="checkbox" id="openPdf"/> Abrir PDF tras generar</label>
+        <div class="form-group inline-checks compact-checks">
+          <label class="inline-check"><input type="checkbox" id="openPdf"/> Abrir PDF tras generar</label>
         </div>
       </div>
 
-      <!---->
       <div class="wizard-nav">
         <button type="button" id="prevBtn">Atrás</button>
         <button type="button" id="nextBtn">Siguiente</button>
