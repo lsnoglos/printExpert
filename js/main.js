@@ -34,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const oW       = document.getElementById('overlapWidth');
   const oH       = document.getElementById('overlapHeight');
   const posBtns  = document.querySelectorAll('[data-pos]');
-  const axisRad  = [...document.getElementsByName('axis')];
   const pXIn     = document.getElementById('pagesX');
   const pYIn     = document.getElementById('pagesY');
   const incBtns  = document.querySelectorAll('.inc');
@@ -163,8 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // – Paso 4:
 
-  axisRad.forEach(r => r.addEventListener('change', drawPreview));
-
   function getImagePlacement(totalWmm, totalHmm){
     if (!keepAsp.checked){
       return { x:0, y:0, w:totalWmm, h:totalHmm };
@@ -192,31 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
           overlapH = +oH.value*10;
 
     
-    const axis = document.querySelector('input[name="axis"]:checked').value;
     pagesX = Math.max(1, +pXIn.value);
     pagesY = Math.max(1, +pYIn.value);
-
-    if (axis==='x') {
-      if (!keepAsp.checked) {
-        pagesY = Math.max(1, +pYIn.value);
-      }
-    } else {
-      if (!keepAsp.checked) {
-        pagesX = Math.max(1, +pXIn.value);
-      }
-    }
-
-    if (keepAsp.checked) {
-      if (axis==='x') {
-        const totalWmm = pagesX*sw - overlapW*(pagesX-1);
-        const totalHmm = totalWmm * (img.naturalHeight/img.naturalWidth);
-        pagesY = Math.max(1, Math.ceil((totalHmm + overlapH)/(sh - overlapH)));
-      } else {
-        const totalHmm = pagesY*sh - overlapH*(pagesY-1);
-        const totalWmm = totalHmm * (img.naturalWidth/img.naturalHeight);
-        pagesX = Math.max(1, Math.ceil((totalWmm + overlapW)/(sw - overlapW)));
-      }
-    }
 
     pXIn.value = pagesX;
     pYIn.value = pagesY;
@@ -301,7 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
     sheetSz, orient,
     mT,mL,mR,mB,
     oW,oH,
-    ...axisRad,
     pXIn,pYIn,
     keepAsp,
     showG,showO
