@@ -69,8 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const overlapH = Math.max(0, +oH.value * 10);
     const blank = blankOverlap.checked;
 
-    const totalWmm = blank ? pagesX * sheetW : pagesX * sheetW - overlapW * (pagesX - 1);
-    const totalHmm = blank ? pagesY * sheetH : pagesY * sheetH - overlapH * (pagesY - 1);
+    const totalWmm = pagesX * sheetW - overlapW * (pagesX - 1);
+    const totalHmm = pagesY * sheetH - overlapH * (pagesY - 1);
 
     return { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm };
   }
@@ -154,8 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const scaleY = PREV_H / totalHmm;
     const tileW = sheetW * scaleX;
     const tileH = sheetH * scaleY;
-    const stepX = blank ? tileW : (sheetW - overlapW) * scaleX;
-    const stepY = blank ? tileH : (sheetH - overlapH) * scaleY;
+    const stepX = (sheetW - overlapW) * scaleX;
+    const stepY = (sheetH - overlapH) * scaleY;
 
     const mt = Math.max(0, +mT.value * 10);
     const ml = Math.max(0, +mL.value * 10);
@@ -191,12 +191,12 @@ document.addEventListener('DOMContentLoaded', () => {
           ctxP.fillRect(0, y - ohPx / 2, PREV_W, ohPx);
         }
       } else {
-        for (let i = 0; i < pagesX - 1; i++) {
-          const x = (i + 1) * stepX - overlapW * scaleX;
+        for (let i = 1; i < pagesX; i++) {
+          const x = i * stepX;
           ctxP.fillRect(x, 0, overlapW * scaleX, PREV_H);
         }
-        for (let j = 0; j < pagesY - 1; j++) {
-          const y = (j + 1) * stepY - overlapH * scaleY;
+        for (let j = 1; j < pagesY; j++) {
+          const y = j * stepY;
           ctxP.fillRect(0, y, PREV_W, overlapH * scaleY);
         }
       }
@@ -240,15 +240,15 @@ document.addEventListener('DOMContentLoaded', () => {
               ctxP.stroke();
             }
           } else {
-            if (x < pagesX - 1 && overlapW > 0) {
-              const gx = tileX + tileW - overlapW * scaleX;
+            if (x > 0 && overlapW > 0) {
+              const gx = tileX + overlapW * scaleX;
               ctxP.beginPath();
               ctxP.moveTo(gx, tileY);
               ctxP.lineTo(gx, tileY + tileH);
               ctxP.stroke();
             }
-            if (y < pagesY - 1 && overlapH > 0) {
-              const gy = tileY + tileH - overlapH * scaleY;
+            if (y > 0 && overlapH > 0) {
+              const gy = tileY + overlapH * scaleY;
               ctxP.beginPath();
               ctxP.moveTo(tileX, gy);
               ctxP.lineTo(tileX + tileW, gy);
@@ -311,33 +311,32 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let x = 0; x < pagesX; x++) {
           if (idx++) pdf.addPage();
 
-          const sx = blank ? x * sheetW : x * (sheetW - overlapW);
-          const sy = blank ? y * sheetH : y * (sheetH - overlapH);
+          const sx = x * (sheetW - overlapW);
+          const sy = y * (sheetH - overlapH);
+          const blankLeftMm = blank && x > 0 ? overlapW : 0;
+          const blankTopMm = blank && y > 0 ? overlapH : 0;
+          const contentWmm = sheetW - blankLeftMm;
+          const contentHmm = sheetH - blankTopMm;
 
-          const srcX0 = Math.floor(sx * mmToPxX);
-          const srcY0 = Math.floor(sy * mmToPxY);
+          const srcX0 = Math.floor((sx + blankLeftMm) * mmToPxX);
+          const srcY0 = Math.floor((sy + blankTopMm) * mmToPxY);
           const srcX1 = Math.ceil((sx + sheetW) * mmToPxX);
           const srcY1 = Math.ceil((sy + sheetH) * mmToPxY);
           const srcW = Math.max(1, srcX1 - srcX0);
           const srcH = Math.max(1, srcY1 - srcY0);
 
           const tileCanvas = document.createElement('canvas');
-          tileCanvas.width = srcW;
-          tileCanvas.height = srcH;
+          tileCanvas.width = Math.max(1, Math.ceil(sheetW * mmToPxX));
+          tileCanvas.height = Math.max(1, Math.ceil(sheetH * mmToPxY));
           const tileCtx = tileCanvas.getContext('2d');
           tileCtx.fillStyle = '#fff';
-          tileCtx.fillRect(0, 0, srcW, srcH);
-          tileCtx.drawImage(posterCanvas, srcX0, srcY0, srcW, srcH, 0, 0, srcW, srcH);
+          tileCtx.fillRect(0, 0, tileCanvas.width, tileCanvas.height);
 
-          if (blank && showO.checked) {
-            tileCtx.fillStyle = '#fff';
-            if (x < pagesX - 1 && overlapW > 0) {
-              tileCtx.fillRect((srcW * (sheetW - overlapW)) / sheetW, 0, (srcW * overlapW) / sheetW, srcH);
-            }
-            if (y < pagesY - 1 && overlapH > 0) {
-              tileCtx.fillRect(0, (srcH * (sheetH - overlapH)) / sheetH, srcW, (srcH * overlapH) / sheetH);
-            }
-          }
+          const dstX = Math.round(blankLeftMm * mmToPxX);
+          const dstY = Math.round(blankTopMm * mmToPxY);
+          const dstW = Math.max(1, Math.ceil(contentWmm * mmToPxX));
+          const dstH = Math.max(1, Math.ceil(contentHmm * mmToPxY));
+          tileCtx.drawImage(posterCanvas, srcX0, srcY0, srcW, srcH, dstX, dstY, dstW, dstH);
 
           pdf.addImage(tileCanvas.toDataURL('image/png'), 'PNG', 0, 0, sheetW, sheetH, undefined, 'FAST');
 
@@ -350,8 +349,8 @@ document.addEventListener('DOMContentLoaded', () => {
               if (y > 0 && overlapH > 0) pdf.line(0, overlapH, sheetW, overlapH);
               if (y < pagesY - 1 && overlapH > 0) pdf.line(0, sheetH - overlapH, sheetW, sheetH - overlapH);
             } else {
-              if (x < pagesX - 1 && overlapW > 0) pdf.line(sheetW - overlapW, 0, sheetW - overlapW, sheetH);
-              if (y < pagesY - 1 && overlapH > 0) pdf.line(0, sheetH - overlapH, sheetW, sheetH - overlapH);
+              if (x > 0 && overlapW > 0) pdf.line(overlapW, 0, overlapW, sheetH);
+              if (y > 0 && overlapH > 0) pdf.line(0, overlapH, sheetW, overlapH);
             }
           }
 
@@ -370,8 +369,8 @@ document.addEventListener('DOMContentLoaded', () => {
               if (x > 0 && overlapW > 0) pdf.line(0, 0, 0, sheetH);
               if (y > 0 && overlapH > 0) pdf.line(0, 0, sheetW, 0);
             } else {
-              if (x < pagesX - 1 && overlapW > 0) pdf.line(sheetW - overlapW, 0, sheetW - overlapW, sheetH);
-              if (y < pagesY - 1 && overlapH > 0) pdf.line(0, sheetH - overlapH, sheetW, sheetH - overlapH);
+              if (x > 0 && overlapW > 0) pdf.line(overlapW, 0, overlapW, sheetH);
+              if (y > 0 && overlapH > 0) pdf.line(0, overlapH, sheetW, overlapH);
             }
           }
         }
