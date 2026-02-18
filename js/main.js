@@ -166,13 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // – Paso 4:
 
   function updateAlignmentControl(){
-    const isPortrait = orient.value === 'portrait';
-    alignLbl.textContent = isPortrait ? 'Alineación vertical:' : 'Alineación horizontal:';
-
-    const options = [...alignIn.options];
-    options[0].textContent = isPortrait ? 'Arriba' : 'Izquierda';
-    options[1].textContent = 'Centro';
-    options[2].textContent = isPortrait ? 'Abajo' : 'Derecha';
+    alignLbl.textContent = 'Alineación de imagen:';
 
     alignGrp.style.display = keepAsp.checked ? '' : 'none';
   }
@@ -184,6 +178,21 @@ document.addEventListener('DOMContentLoaded', () => {
     return spare / 2;
   }
 
+  function getAlignmentModes(){
+    switch (alignIn.value) {
+      case 'top':
+        return { horizontal: 'center', vertical: 'start' };
+      case 'bottom':
+        return { horizontal: 'center', vertical: 'end' };
+      case 'left':
+        return { horizontal: 'start', vertical: 'center' };
+      case 'right':
+        return { horizontal: 'end', vertical: 'center' };
+      default:
+        return { horizontal: 'center', vertical: 'center' };
+    }
+  }
+
   function getImagePlacement(totalWmm, totalHmm){
     if (!keepAsp.checked){
       return { x:0, y:0, w:totalWmm, h:totalHmm };
@@ -191,23 +200,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const imgRatio = img.naturalWidth / img.naturalHeight;
     const posterRatio = totalWmm / totalHmm;
+    const align = getAlignmentModes();
 
     if (imgRatio > posterRatio){
       const w = totalWmm;
       const h = w / imgRatio;
       const spareY = totalHmm - h;
-      const y = orient.value === 'portrait'
-        ? getOffset(spareY, alignIn.value)
-        : spareY / 2;
+      const y = getOffset(spareY, align.vertical);
       return { x:0, y, w, h };
     }
 
     const h = totalHmm;
     const w = h * imgRatio;
     const spareX = totalWmm - w;
-    const x = orient.value === 'landscape'
-      ? getOffset(spareX, alignIn.value)
-      : spareX / 2;
+    const x = getOffset(spareX, align.horizontal);
     return { x, y:0, w, h };
   }
   function drawPreview(){
