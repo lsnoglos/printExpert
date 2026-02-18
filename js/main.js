@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const incBtns  = document.querySelectorAll('.inc');
   const resLab   = document.getElementById('resultLabel');
   const keepAsp  = document.getElementById('keepAspect');
+  const alignIn  = document.getElementById('imageAlign');
+  const alignLbl = document.getElementById('imageAlignLabel');
+  const alignGrp = document.getElementById('alignmentGroup');
   const showG    = document.getElementById('showGuides');
   const showO    = document.getElementById('showOverlap');
   const openChk  = document.getElementById('openPdf');
@@ -162,6 +165,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // – Paso 4:
 
+  function updateAlignmentControl(){
+    const isPortrait = orient.value === 'portrait';
+    alignLbl.textContent = isPortrait ? 'Alineación vertical:' : 'Alineación horizontal:';
+
+    const options = [...alignIn.options];
+    options[0].textContent = isPortrait ? 'Arriba' : 'Izquierda';
+    options[1].textContent = 'Centro';
+    options[2].textContent = isPortrait ? 'Abajo' : 'Derecha';
+
+    alignGrp.style.display = keepAsp.checked ? '' : 'none';
+  }
+
+  function getOffset(spare, mode){
+    if (spare <= 0) return 0;
+    if (mode === 'start') return 0;
+    if (mode === 'end') return spare;
+    return spare / 2;
+  }
+
   function getImagePlacement(totalWmm, totalHmm){
     if (!keepAsp.checked){
       return { x:0, y:0, w:totalWmm, h:totalHmm };
@@ -173,12 +195,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (imgRatio > posterRatio){
       const w = totalWmm;
       const h = w / imgRatio;
-      return { x:0, y:(totalHmm - h) / 2, w, h };
+      const spareY = totalHmm - h;
+      const y = orient.value === 'portrait'
+        ? getOffset(spareY, alignIn.value)
+        : spareY / 2;
+      return { x:0, y, w, h };
     }
 
     const h = totalHmm;
     const w = h * imgRatio;
-    return { x:(totalWmm - w) / 2, y:0, w, h };
+    const spareX = totalWmm - w;
+    const x = orient.value === 'landscape'
+      ? getOffset(spareX, alignIn.value)
+      : spareX / 2;
+    return { x, y:0, w, h };
   }
   function drawPreview(){
     if (!img) return;
@@ -276,9 +306,12 @@ document.addEventListener('DOMContentLoaded', () => {
     mT,mL,mR,mB,
     oW,oH,
     pXIn,pYIn,
-    keepAsp,
+    keepAsp, alignIn,
     showG,showO
   ].forEach(el=> el.addEventListener('input', e=>{
+    if (e.target === orient || e.target === keepAsp) {
+      updateAlignmentControl();
+    }
     if ([mT,mL,mR,mB].includes(e.target)) {
       syncMarginsFrom(e.target);
     }
@@ -292,6 +325,8 @@ document.addEventListener('DOMContentLoaded', () => {
     drawMargin();
     drawPreview();
   });
+
+  updateAlignmentControl();
 
 
 
