@@ -342,15 +342,16 @@ document.addEventListener('DOMContentLoaded', () => {
           pdf.addImage(tileCanvas.toDataURL('image/png'), 'PNG', 0, 0, sheetW, sheetH, undefined, 'FAST');
 
           if (showO.checked) {
-            pdf.setFillColor(210, 245, 220);
+            pdf.setLineDash([2, 2], 0);
+            pdf.setDrawColor(15, 157, 88);
             if (!blank) {
-              if (x > 0) pdf.rect(0, 0, overlapW, sheetH, 'F');
-              if (x < pagesX - 1) pdf.rect(sheetW - overlapW, 0, overlapW, sheetH, 'F');
-              if (y > 0) pdf.rect(0, 0, sheetW, overlapH, 'F');
-              if (y < pagesY - 1) pdf.rect(0, sheetH - overlapH, sheetW, overlapH, 'F');
+              if (x > 0 && overlapW > 0) pdf.line(overlapW, 0, overlapW, sheetH);
+              if (x < pagesX - 1 && overlapW > 0) pdf.line(sheetW - overlapW, 0, sheetW - overlapW, sheetH);
+              if (y > 0 && overlapH > 0) pdf.line(0, overlapH, sheetW, overlapH);
+              if (y < pagesY - 1 && overlapH > 0) pdf.line(0, sheetH - overlapH, sheetW, sheetH - overlapH);
             } else {
-              if (x < pagesX - 1) pdf.rect(sheetW - overlapW, 0, overlapW, sheetH, 'F');
-              if (y < pagesY - 1) pdf.rect(0, sheetH - overlapH, sheetW, overlapH, 'F');
+              if (x < pagesX - 1 && overlapW > 0) pdf.line(sheetW - overlapW, 0, sheetW - overlapW, sheetH);
+              if (y < pagesY - 1 && overlapH > 0) pdf.line(0, sheetH - overlapH, sheetW, sheetH - overlapH);
             }
           }
 
