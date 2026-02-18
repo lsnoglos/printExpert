@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const mL       = document.getElementById('marginLeft');
   const mR       = document.getElementById('marginRight');
   const mB       = document.getElementById('marginBottom');
+  const linkM    = document.getElementById('linkMargins');
   const resetM   = document.getElementById('resetMarginsBtn');
   const oW       = document.getElementById('overlapWidth');
   const oH       = document.getElementById('overlapHeight');
@@ -110,6 +111,14 @@ document.addEventListener('DOMContentLoaded', () => {
     drawPreview();
   };
 
+  function syncMarginsFrom(sourceInput){
+    if (!linkM.checked) return;
+    const v = sourceInput.value;
+    [mT, mL, mR, mB].forEach(input => {
+      if (input !== sourceInput) input.value = v;
+    });
+  }
+
 
   // – Paso 2: Preview 
 
@@ -184,17 +193,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     
     const axis = document.querySelector('input[name="axis"]:checked').value;
+    pagesX = Math.max(1, +pXIn.value);
+    pagesY = Math.max(1, +pYIn.value);
+
     if (axis==='x') {
-      pagesX = Math.max(1, +pXIn.value);
-      const totalWmm = pagesX*sw - overlapW*(pagesX-1);
-      const totalHmm = totalWmm * (img.naturalHeight/img.naturalWidth);
-      pagesY = Math.max(1, Math.ceil((totalHmm + overlapH)/sh));
+      if (!keepAsp.checked) {
+        pagesY = Math.max(1, +pYIn.value);
+      }
     } else {
-      pagesY = Math.max(1, +pYIn.value);
-      const totalHmm = pagesY*sh - overlapH*(pagesY-1);
-      const totalWmm = totalHmm * (img.naturalWidth/img.naturalHeight);
-      pagesX = Math.max(1, Math.ceil((totalWmm + overlapW)/sw));
+      if (!keepAsp.checked) {
+        pagesX = Math.max(1, +pXIn.value);
+      }
     }
+
+    if (keepAsp.checked) {
+      if (axis==='x') {
+        const totalWmm = pagesX*sw - overlapW*(pagesX-1);
+        const totalHmm = totalWmm * (img.naturalHeight/img.naturalWidth);
+        pagesY = Math.max(1, Math.ceil((totalHmm + overlapH)/(sh - overlapH)));
+      } else {
+        const totalHmm = pagesY*sh - overlapH*(pagesY-1);
+        const totalWmm = totalHmm * (img.naturalWidth/img.naturalHeight);
+        pagesX = Math.max(1, Math.ceil((totalWmm + overlapW)/(sw - overlapW)));
+      }
+    }
+
     pXIn.value = pagesX;
     pYIn.value = pagesY;
     resLab.textContent = `Páginas: ${pagesX}×${pagesY}`;
@@ -282,15 +305,45 @@ document.addEventListener('DOMContentLoaded', () => {
     pXIn,pYIn,
     keepAsp,
     showG,showO
-  ].forEach(el=> el.addEventListener('input', ()=>{
+  ].forEach(el=> el.addEventListener('input', e=>{
+    if ([mT,mL,mR,mB].includes(e.target)) {
+      syncMarginsFrom(e.target);
+    }
     drawMargin();
     drawOverlap();
     drawPreview();
   }));
 
+  linkM.addEventListener('change', () => {
+    if (linkM.checked) syncMarginsFrom(mT);
+    drawMargin();
+    drawPreview();
+  });
+
 
 
   // — Paso 5: PDF —
+
+  function createPosterRaster(totalWmm, totalHmm, placement){
+    const posterPxWidth = Math.max(1, Math.ceil(totalWmm * 12));
+    const posterPxHeight = Math.max(1, Math.ceil(totalHmm * 12));
+    const canvas = document.createElement('canvas');
+    canvas.width = posterPxWidth;
+    canvas.height = posterPxHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, posterPxWidth, posterPxHeight);
+
+    ctx.drawImage(
+      img,
+      placement.x / totalWmm * posterPxWidth,
+      placement.y / totalHmm * posterPxHeight,
+      placement.w / totalWmm * posterPxWidth,
+      placement.h / totalHmm * posterPxHeight
+    );
+
+    return canvas;
+  }
 
   async function generatePoster(){
     if (!img) return alert('Primero carga y recorta una imagen');
@@ -310,6 +363,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const totalWmm = pagesX * sheetW - overlapW * (pagesX - 1);
       const totalHmm = pagesY * sheetH - overlapH * (pagesY - 1);
       const placement = getImagePlacement(totalWmm, totalHmm);
+      const posterCanvas = createPosterRaster(totalWmm, totalHmm, placement);
+      const mmToPxX = posterCanvas.width / totalWmm;
+      const mmToPxY = posterCanvas.height / totalHmm;
 
       let idx=0;
       for(let y=0;y<pagesY;y++){
@@ -318,13 +374,36 @@ document.addEventListener('DOMContentLoaded', () => {
           const sx = x * (sheetW - overlapW);
           const sy = y * (sheetH - overlapH);
 
+          const srcX = Math.round(sx * mmToPxX);
+          const srcY = Math.round(sy * mmToPxY);
+          const srcW = Math.round(sheetW * mmToPxX);
+          const srcH = Math.round(sheetH * mmToPxY);
+
+          const tileCanvas = document.createElement('canvas');
+          tileCanvas.width = srcW;
+          tileCanvas.height = srcH;
+          const tileCtx = tileCanvas.getContext('2d');
+          tileCtx.fillStyle = '#fff';
+          tileCtx.fillRect(0, 0, srcW, srcH);
+          tileCtx.drawImage(
+            posterCanvas,
+            srcX,
+            srcY,
+            srcW,
+            srcH,
+            0,
+            0,
+            srcW,
+            srcH
+          );
+
           pdf.addImage(
-            img.src,
+            tileCanvas,
             'PNG',
-            placement.x - sx,
-            placement.y - sy,
-            placement.w,
-            placement.h
+            0,
+            0,
+            sheetW,
+            sheetH
           );
 
           if (showG.checked){
