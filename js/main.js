@@ -307,14 +307,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-  [
+  const previewInputs = [
     sheetSz, orient,
     mT,mL,mR,mB,
     oW,oH,
     pXIn,pYIn,
     keepAsp, alignIn,
     showG,showO
-  ].forEach(el=> el.addEventListener('input', e=>{
+  ];
+
+  function handlePreviewControlChange(e){
     if (e.target === orient || e.target === keepAsp) {
       updateAlignmentControl();
     }
@@ -324,7 +326,12 @@ document.addEventListener('DOMContentLoaded', () => {
     drawMargin();
     drawOverlap();
     drawPreview();
-  }));
+  }
+
+  previewInputs.forEach(el=> {
+    el.addEventListener('input', handlePreviewControlChange);
+    el.addEventListener('change', handlePreviewControlChange);
+  });
 
   linkM.addEventListener('change', () => {
     if (linkM.checked) syncMarginsFrom(mT);
