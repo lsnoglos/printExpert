@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const pYIn     = document.getElementById('pagesY');
   const incBtns  = document.querySelectorAll('.inc');
   const resLab   = document.getElementById('resultLabel');
+  const keepAsp  = document.getElementById('keepAspect');
   const showG    = document.getElementById('showGuides');
   const showO    = document.getElementById('showOverlap');
   const openChk  = document.getElementById('openPdf');
@@ -154,6 +155,25 @@ document.addEventListener('DOMContentLoaded', () => {
   // – Paso 4:
 
   axisRad.forEach(r => r.addEventListener('change', drawPreview));
+
+  function getImagePlacement(totalWmm, totalHmm){
+    if (!keepAsp.checked){
+      return { x:0, y:0, w:totalWmm, h:totalHmm };
+    }
+
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const posterRatio = totalWmm / totalHmm;
+
+    if (imgRatio > posterRatio){
+      const w = totalWmm;
+      const h = w / imgRatio;
+      return { x:0, y:(totalHmm - h) / 2, w, h };
+    }
+
+    const h = totalHmm;
+    const w = h * imgRatio;
+    return { x:(totalWmm - w) / 2, y:0, w, h };
+  }
   function drawPreview(){
     if (!img) return;
     const {w:sw0,h:sh0} = sheets[sheetSz.value];
@@ -190,28 +210,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const tileW = PREV_W/pagesX,
           tileH = PREV_H/pagesY;
-    const ppmX  = img.naturalWidth/totalWmm,
-          ppmY  = img.naturalHeight/totalHmm;
 
+    const placement = getImagePlacement(totalWmm, totalHmm);
+    const scaleX = PREV_W / totalWmm;
+    const scaleY = PREV_H / totalHmm;
 
     ctxP.clearRect(0,0,PREV_W,PREV_H);
-    for (let y=0; y<pagesY; y++){
-      for (let x=0; x<pagesX; x++){
-        const sxMm = x*(sw-overlapW),
-              syMm = y*(sh-overlapH),
-              swMm = sw + (x>0?overlapW:0)+(x<pagesX-1?overlapW:0),
-              shMm = sh + (y>0?overlapH:0)+(y<pagesY-1?overlapH:0);
-        const sxPx = sxMm*ppmX,
-              syPx = syMm*ppmY,
-              sWPx = swMm*ppmX,
-              sHPx = shMm*ppmY;
-        ctxP.drawImage(
-          img,
-          sxPx, syPx, sWPx, sHPx,
-          x*tileW, y*tileH, tileW, tileH
-        );
-      }
-    }
+    ctxP.fillStyle = '#fff';
+    ctxP.fillRect(0,0,PREV_W,PREV_H);
+    ctxP.drawImage(
+      img,
+      placement.x * scaleX,
+      placement.y * scaleY,
+      placement.w * scaleX,
+      placement.h * scaleY
+    );
 
 
     // 5) Cuadrícula
@@ -267,6 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     oW,oH,
     ...axisRad,
     pXIn,pYIn,
+    keepAsp,
     showG,showO
   ].forEach(el=> el.addEventListener('input', ()=>{
     drawMargin();
@@ -288,34 +302,44 @@ document.addEventListener('DOMContentLoaded', () => {
         format:[ sheets[sheetSz.value].w, sheets[sheetSz.value].h ],
         orientation: orient.value
       });
+      const { w:baseW, h:baseH } = sheets[sheetSz.value];
+      const sheetW = orient.value === 'landscape' ? baseH : baseW;
+      const sheetH = orient.value === 'landscape' ? baseW : baseH;
+      const overlapW = +oW.value * 10;
+      const overlapH = +oH.value * 10;
+      const totalWmm = pagesX * sheetW - overlapW * (pagesX - 1);
+      const totalHmm = pagesY * sheetH - overlapH * (pagesY - 1);
+      const placement = getImagePlacement(totalWmm, totalHmm);
+
       let idx=0;
       for(let y=0;y<pagesY;y++){
         for(let x=0;x<pagesX;x++){
           if (idx++) pdf.addPage();
-          const sx = x*(sheets[sheetSz.value].w - +oW.value*10),
-                sy = y*(sheets[sheetSz.value].h - +oH.value*10);
-          pdf.addImage(img.src,'PNG',
-                       -sx, -sy,
-                       pagesX * sheets[sheetSz.value].w,
-                       pagesY * sheets[sheetSz.value].h);
+          const sx = x * (sheetW - overlapW);
+          const sy = y * (sheetH - overlapH);
+
+          pdf.addImage(
+            img.src,
+            'PNG',
+            placement.x - sx,
+            placement.y - sy,
+            placement.w,
+            placement.h
+          );
+
           if (showG.checked){
             pdf.setLineDash([3,3],0);
             pdf.setDrawColor(255,0,0);
-            pdf.rect(0,0,
-                     sheets[sheetSz.value].w,
-                     sheets[sheetSz.value].h);
+            pdf.rect(0,0,sheetW,sheetH);
           }
+
           if (showO.checked){
-            if(x>0) pdf.addImage(img.src,'PNG',
-                                 -sx+ +oW.value*10, -sy,
-                                 pagesX * sheets[sheetSz.value].w,
-                                 pagesY * sheets[sheetSz.value].h);
-            if(y>0) pdf.addImage(img.src,'PNG',
-                                 -sx, -sy+ +oH.value*10,
-                                 pagesX * sheets[sheetSz.value].w,
-                                 pagesY * sheets[sheetSz.value].h);
+            pdf.setFillColor(255,220,220);
+            if (x > 0) pdf.rect(0, 0, overlapW, sheetH, 'F');
+            if (x < pagesX - 1) pdf.rect(sheetW - overlapW, 0, overlapW, sheetH, 'F');
+            if (y > 0) pdf.rect(0, 0, sheetW, overlapH, 'F');
+            if (y < pagesY - 1) pdf.rect(0, sheetH - overlapH, sheetW, overlapH, 'F');
           }
-          idx++;
         }
       }
       pdf.save('poster.pdf');
