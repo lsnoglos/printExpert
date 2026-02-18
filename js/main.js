@@ -1,10 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const STORAGE_KEY = 'printExpertState';
   const TOTAL_STEPS = 4;
   const steps = [...document.querySelectorAll('.step')];
   let current = 1;
   const prevBtn = document.getElementById('prevBtn');
   const nextBtn = document.getElementById('nextBtn');
+  const newBtn = document.getElementById('newBtn');
   const loadingOverlay = document.getElementById('loadingOverlay');
+  const wizardForm = document.getElementById('wizardForm');
 
   function show(n) {
     steps.forEach(s => s.classList.remove('active'));
@@ -13,12 +16,20 @@ document.addEventListener('DOMContentLoaded', () => {
     nextBtn.textContent = n === TOTAL_STEPS ? 'Generar y Guardar' : 'Siguiente';
   }
 
-  prevBtn.onclick = () => { if (current > 1) show(--current); };
-  nextBtn.onclick = () => {
-    if (current < TOTAL_STEPS) show(++current);
-    else generatePoster();
+  prevBtn.onclick = () => {
+    if (current > 1) {
+      show(--current);
+      saveState();
+    }
   };
-  show(current);
+  nextBtn.onclick = () => {
+    if (current < TOTAL_STEPS) {
+      show(++current);
+      saveState();
+    } else {
+      generatePoster();
+    }
+  };
 
   let img = null;
   let pagesX = 1;
@@ -57,8 +68,18 @@ document.addEventListener('DOMContentLoaded', () => {
   function setLoading(isLoading) {
     loadingOverlay.classList.toggle('visible', isLoading);
     loadingOverlay.setAttribute('aria-hidden', String(!isLoading));
-    nextBtn.disabled = isLoading;
-    prevBtn.disabled = isLoading;
+    wizardForm.classList.toggle('is-loading', isLoading);
+
+    const controls = wizardForm.querySelectorAll('button, input, select, textarea');
+    controls.forEach(control => {
+      control.disabled = isLoading;
+    });
+  }
+
+  function waitForPaint() {
+    return new Promise(resolve => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
   }
 
   const sheets = {
@@ -66,6 +87,64 @@ document.addEventListener('DOMContentLoaded', () => {
     A4: { w: 210, h: 297 },
     tabloid: { w: 279, h: 432 }
   };
+
+  function getDefaultState() {
+    return {
+      current: 1,
+      imageData: '',
+      sheetSize: 'letter',
+      orientation: 'portrait',
+      marginTop: '0',
+      marginLeft: '0',
+      marginRight: '0',
+      marginBottom: '0',
+      linkMargins: false,
+      overlapWidth: '1',
+      overlapHeight: '1',
+      blankOverlap: false,
+      pagesX: '1',
+      pagesY: '1',
+      keepAspect: true,
+      imageAlign: 'center',
+      showGuides: true,
+      styledGuides: true,
+      showOverlap: true,
+      openPdf: false
+    };
+  }
+
+  function getState() {
+    return {
+      current,
+      imageData: img ? img.src : '',
+      sheetSize: sheetSz.value,
+      orientation: orient.value,
+      marginTop: mT.value,
+      marginLeft: mL.value,
+      marginRight: mR.value,
+      marginBottom: mB.value,
+      linkMargins: linkM.checked,
+      overlapWidth: oW.value,
+      overlapHeight: oH.value,
+      blankOverlap: blankOverlap.checked,
+      pagesX: pXIn.value,
+      pagesY: pYIn.value,
+      keepAspect: keepAsp.checked,
+      imageAlign: alignIn.value,
+      showGuides: showG.checked,
+      styledGuides: styledG.checked,
+      showOverlap: showO.checked,
+      openPdf: openChk.checked
+    };
+  }
+
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(getState()));
+  }
+
+  function clearSavedState() {
+    localStorage.removeItem(STORAGE_KEY);
+  }
 
   function getSheetSizeMm() {
     const { w: sw0, h: sh0 } = sheets[sheetSz.value];
@@ -155,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm } = getPosterGeometry();
 
     const PREV_W = 460;
-    const PREV_H = Math.max(120, Math.round(PREV_W * totalHmm / totalWmm));
+    const PREV_H = Math.max(120, Math.round((PREV_W * totalHmm) / totalWmm));
     cPrev.width = PREV_W;
     cPrev.height = PREV_H;
 
@@ -304,8 +383,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function generatePoster() {
     if (!img) return alert('Primero carga y recorta una imagen');
-    drawPreview();
     setLoading(true);
+    await waitForPaint();
+
+    drawPreview();
+    await waitForPaint();
 
     try {
       const { jsPDF } = window.jspdf;
@@ -329,6 +411,10 @@ document.addEventListener('DOMContentLoaded', () => {
       let idx = 0;
       for (let y = 0; y < pagesY; y++) {
         for (let x = 0; x < pagesX; x++) {
+          if (idx > 0 && idx % 3 === 0) {
+            await waitForPaint();
+          }
+
           if (idx++) pdf.addPage();
 
           const sx = x * (sheetW - overlapW);
@@ -420,9 +506,88 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function resetFormToDefaults() {
+    const state = getDefaultState();
+    current = state.current;
+    sheetSz.value = state.sheetSize;
+    orient.value = state.orientation;
+    mT.value = state.marginTop;
+    mL.value = state.marginLeft;
+    mR.value = state.marginRight;
+    mB.value = state.marginBottom;
+    linkM.checked = state.linkMargins;
+    oW.value = state.overlapWidth;
+    oH.value = state.overlapHeight;
+    blankOverlap.checked = state.blankOverlap;
+    pXIn.value = state.pagesX;
+    pYIn.value = state.pagesY;
+    keepAsp.checked = state.keepAspect;
+    alignIn.value = state.imageAlign;
+    showG.checked = state.showGuides;
+    styledG.checked = state.styledGuides;
+    showO.checked = state.showOverlap;
+    openChk.checked = state.openPdf;
+    fileIn.value = '';
+    imgPrev.removeAttribute('src');
+    img = null;
+    if (cropper) {
+      cropper.destroy();
+      cropper = null;
+    }
+    cPrev.height = 0;
+    resLab.textContent = '—';
+    updateAlignmentControl();
+    show(current);
+  }
+
+  function hydrateState() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      blankOverlap.checked = false;
+      return;
+    }
+
+    try {
+      const state = { ...getDefaultState(), ...JSON.parse(raw) };
+      current = Math.min(TOTAL_STEPS, Math.max(1, +state.current || 1));
+      sheetSz.value = state.sheetSize;
+      orient.value = state.orientation;
+      mT.value = state.marginTop;
+      mL.value = state.marginLeft;
+      mR.value = state.marginRight;
+      mB.value = state.marginBottom;
+      linkM.checked = !!state.linkMargins;
+      oW.value = state.overlapWidth;
+      oH.value = state.overlapHeight;
+      blankOverlap.checked = !!state.blankOverlap;
+      pXIn.value = state.pagesX;
+      pYIn.value = state.pagesY;
+      keepAsp.checked = !!state.keepAspect;
+      alignIn.value = state.imageAlign;
+      showG.checked = !!state.showGuides;
+      styledG.checked = !!state.styledGuides;
+      showO.checked = !!state.showOverlap;
+      openChk.checked = !!state.openPdf;
+
+      if (state.imageData) {
+        imgPrev.src = state.imageData;
+        img = new Image();
+        img.onload = drawPreview;
+        img.src = state.imageData;
+      }
+    } catch {
+      clearSavedState();
+      blankOverlap.checked = false;
+    }
+  }
+
   fileIn.onchange = () => {
     const f = fileIn.files[0];
     if (!f) return;
+
+    clearSavedState();
+    resetFormToDefaults();
+
     const reader = new FileReader();
     reader.onload = e => {
       const url = e.target.result;
@@ -436,7 +601,10 @@ document.addEventListener('DOMContentLoaded', () => {
         zoomable: true
       });
       img = new Image();
-      img.onload = drawPreview;
+      img.onload = () => {
+        drawPreview();
+        saveState();
+      };
       img.src = url;
     };
     reader.readAsDataURL(f);
@@ -450,13 +618,17 @@ document.addEventListener('DOMContentLoaded', () => {
     cropper = null;
     imgPrev.src = url;
     img = new Image();
-    img.onload = drawPreview;
+    img.onload = () => {
+      drawPreview();
+      saveState();
+    };
     img.src = url;
   };
 
   resetM.onclick = () => {
     mT.value = mL.value = mR.value = mB.value = 0;
     drawPreview();
+    saveState();
   };
 
   incBtns.forEach(b => {
@@ -466,18 +638,28 @@ document.addEventListener('DOMContentLoaded', () => {
       v = b.dataset.op === '+' ? v + 1 : Math.max(1, v - 1);
       t.value = v;
       drawPreview();
+      saveState();
     };
   });
 
   const previewInputs = [
     sheetSz,
     orient,
-    mT, mL, mR, mB,
-    oW, oH,
+    mT,
+    mL,
+    mR,
+    mB,
+    oW,
+    oH,
     blankOverlap,
-    pXIn, pYIn,
-    keepAsp, alignIn,
-    showG, styledG, showO
+    pXIn,
+    pYIn,
+    keepAsp,
+    alignIn,
+    showG,
+    styledG,
+    showO,
+    openChk
   ];
 
   function handlePreviewControlChange(e) {
@@ -488,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
       syncMarginsFrom(e.target);
     }
     drawPreview();
+    saveState();
   }
 
   previewInputs.forEach(el => {
@@ -498,7 +681,16 @@ document.addEventListener('DOMContentLoaded', () => {
   linkM.addEventListener('change', () => {
     if (linkM.checked) syncMarginsFrom(mT);
     drawPreview();
+    saveState();
   });
 
+  newBtn.addEventListener('click', () => {
+    clearSavedState();
+    resetFormToDefaults();
+  });
+
+  hydrateState();
   updateAlignmentControl();
+  show(current);
+  saveState();
 });

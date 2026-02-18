@@ -201,6 +201,10 @@ button:disabled {
   flex: 1;
 }
 
+.wizard-nav #newBtn {
+  background: linear-gradient(140deg, #ef4444 0%, #f97316 100%);
+}
+
 .wizard-nav #nextBtn {
   background: linear-gradient(140deg, var(--accent) 0%, #14b8a6 100%);
 }
@@ -219,6 +223,16 @@ canvas {
   max-width: 100% !important;
   border-radius: 12px;
   overflow: hidden;
+}
+
+
+#wizardForm.is-loading {
+  pointer-events: none;
+  user-select: none;
+}
+
+#wizardForm.is-loading .wizard-nav button {
+  opacity: 0.75;
 }
 
 .loading-overlay {
