@@ -101,12 +101,12 @@ document.addEventListener('DOMContentLoaded', () => {
       linkMargins: false,
       overlapWidth: '1',
       overlapHeight: '1',
-      blankOverlap: false,
+      blankOverlap: true,
       pagesX: '1',
       pagesY: '1',
       keepAspect: true,
       imageAlign: 'center',
-      showGuides: true,
+      showGuides: false,
       styledGuides: true,
       showOverlap: true,
       openPdf: false
@@ -144,6 +144,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function clearSavedState() {
     localStorage.removeItem(STORAGE_KEY);
+  }
+
+  function hasSavedImageData() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+
+    try {
+      const state = JSON.parse(raw);
+      return Boolean(state?.imageData);
+    } catch {
+      return false;
+    }
   }
 
   function getSheetSizeMm() {
@@ -543,7 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function hydrateState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      blankOverlap.checked = false;
+      blankOverlap.checked = true;
       return;
     }
 
@@ -577,7 +589,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch {
       clearSavedState();
-      blankOverlap.checked = false;
+      blankOverlap.checked = true;
     }
   }
 
@@ -685,6 +697,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   newBtn.addEventListener('click', () => {
+    if (hasSavedImageData()) {
+      const confirmed = window.confirm('Se perderá la última imagen cargada. ¿Deseas continuar con un nuevo proyecto?');
+      if (!confirmed) return;
+    }
+
     clearSavedState();
     resetFormToDefaults();
   });
