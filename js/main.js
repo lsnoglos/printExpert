@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const alignLbl = document.getElementById('imageAlignLabel');
   const alignGrp = document.getElementById('alignmentGroup');
   const showG = document.getElementById('showGuides');
+  const styledG = document.getElementById('styledGuides');
   const showO = document.getElementById('showOverlap');
   const openChk = document.getElementById('openPdf');
   const cPrev = document.getElementById('previewCanvas');
@@ -205,7 +206,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (showG.checked) {
       ctxP.save();
-      ctxP.setLineDash([5, 3]);
+      if (styledG.checked) {
+        ctxP.setLineDash([5, 3]);
+      } else {
+        ctxP.setLineDash([]);
+      }
 
       for (let y = 0; y < pagesY; y++) {
         for (let x = 0; x < pagesX; x++) {
@@ -217,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const mTopPx = Math.min(mt * scaleY, tileH / 2);
           const mBottomPx = Math.min(mb * scaleY, tileH / 2);
 
-          ctxP.strokeStyle = '#cf1b1b';
+          ctxP.strokeStyle = styledG.checked ? '#cf1b1b' : '#2b2b2b';
           ctxP.strokeRect(
             tileX + mLeftPx,
             tileY + mTopPx,
@@ -225,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Math.max(1, tileH - mTopPx - mBottomPx)
           );
 
-          ctxP.strokeStyle = '#0f9d58';
+          ctxP.strokeStyle = styledG.checked ? '#0f9d58' : '#2b2b2b';
           if (!blank) {
             if (x > 0 && overlapW > 0) {
               ctxP.beginPath();
@@ -260,6 +265,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       ctxP.restore();
     }
+  }
+
+  function toPixelBounds(startMm, sizeMm, mmToPx, maxPx) {
+    const start = Math.max(0, Math.min(maxPx, Math.round(startMm * mmToPx)));
+    const end = Math.max(start, Math.min(maxPx, Math.round((startMm + sizeMm) * mmToPx)));
+    return { start, size: Math.max(1, end - start) };
   }
 
   function createPosterRaster(totalWmm, totalHmm, placement) {
@@ -318,12 +329,8 @@ document.addEventListener('DOMContentLoaded', () => {
           const contentWmm = sheetW - blankLeftMm;
           const contentHmm = sheetH - blankTopMm;
 
-          const srcX0 = Math.floor((sx + blankLeftMm) * mmToPxX);
-          const srcY0 = Math.floor((sy + blankTopMm) * mmToPxY);
-          const srcX1 = Math.ceil((sx + sheetW) * mmToPxX);
-          const srcY1 = Math.ceil((sy + sheetH) * mmToPxY);
-          const srcW = Math.max(1, srcX1 - srcX0);
-          const srcH = Math.max(1, srcY1 - srcY0);
+          const srcBoundsX = toPixelBounds(sx + blankLeftMm, contentWmm, mmToPxX, posterCanvas.width);
+          const srcBoundsY = toPixelBounds(sy + blankTopMm, contentHmm, mmToPxY, posterCanvas.height);
 
           const tileCanvas = document.createElement('canvas');
           tileCanvas.width = Math.max(1, Math.ceil(sheetW * mmToPxX));
@@ -332,17 +339,29 @@ document.addEventListener('DOMContentLoaded', () => {
           tileCtx.fillStyle = '#fff';
           tileCtx.fillRect(0, 0, tileCanvas.width, tileCanvas.height);
 
-          const dstX = Math.round(blankLeftMm * mmToPxX);
-          const dstY = Math.round(blankTopMm * mmToPxY);
-          const dstW = Math.max(1, Math.ceil(contentWmm * mmToPxX));
-          const dstH = Math.max(1, Math.ceil(contentHmm * mmToPxY));
-          tileCtx.drawImage(posterCanvas, srcX0, srcY0, srcW, srcH, dstX, dstY, dstW, dstH);
+          const dstBoundsX = toPixelBounds(blankLeftMm, contentWmm, mmToPxX, tileCanvas.width);
+          const dstBoundsY = toPixelBounds(blankTopMm, contentHmm, mmToPxY, tileCanvas.height);
+          tileCtx.drawImage(
+            posterCanvas,
+            srcBoundsX.start,
+            srcBoundsY.start,
+            srcBoundsX.size,
+            srcBoundsY.size,
+            dstBoundsX.start,
+            dstBoundsY.start,
+            dstBoundsX.size,
+            dstBoundsY.size
+          );
 
           pdf.addImage(tileCanvas.toDataURL('image/png'), 'PNG', 0, 0, sheetW, sheetH, undefined, 'FAST');
 
           if (showO.checked) {
-            pdf.setLineDash([2, 2], 0);
-            pdf.setDrawColor(15, 157, 88);
+            pdf.setLineDash(styledG.checked ? [2, 2] : [], 0);
+            if (styledG.checked) {
+              pdf.setDrawColor(15, 157, 88);
+            } else {
+              pdf.setDrawColor(60, 60, 60);
+            }
             if (!blank) {
               if (x > 0 && overlapW > 0) pdf.line(overlapW, 0, overlapW, sheetH);
               if (x < pagesX - 1 && overlapW > 0) pdf.line(sheetW - overlapW, 0, sheetW - overlapW, sheetH);
@@ -355,16 +374,23 @@ document.addEventListener('DOMContentLoaded', () => {
           }
 
           if (showG.checked) {
-            pdf.setLineDash([3, 3], 0);
-            pdf.setDrawColor(207, 27, 27);
+            pdf.setLineDash(styledG.checked ? [3, 3] : [], 0);
+            if (styledG.checked) {
+              pdf.setDrawColor(207, 27, 27);
+            } else {
+              pdf.setDrawColor(43, 43, 43);
+            }
             pdf.rect(
               Math.min(ml, sheetW / 2),
               Math.min(mt, sheetH / 2),
               Math.max(1, sheetW - Math.min(ml, sheetW / 2) - Math.min(mr, sheetW / 2)),
               Math.max(1, sheetH - Math.min(mt, sheetH / 2) - Math.min(mb, sheetH / 2))
             );
-
-            pdf.setDrawColor(15, 157, 88);
+            if (styledG.checked) {
+              pdf.setDrawColor(15, 157, 88);
+            } else {
+              pdf.setDrawColor(43, 43, 43);
+            }
             if (!blank) {
               if (x > 0 && overlapW > 0) pdf.line(0, 0, 0, sheetH);
               if (y > 0 && overlapH > 0) pdf.line(0, 0, sheetW, 0);
@@ -440,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
     blankOverlap,
     pXIn, pYIn,
     keepAsp, alignIn,
-    showG, showO
+    showG, styledG, showO
   ];
 
   function handlePreviewControlChange(e) {
