@@ -14,6 +14,13 @@
 </head>
 
 <body>
+  <div id="loadingOverlay" class="loading-overlay" aria-live="polite" aria-hidden="true">
+    <div class="loading-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Generando PDF, por favor espera...</p>
+    </div>
+  </div>
+
   <header><h1>PrintExpert 🖶</h1></header>
 
   <main>
@@ -84,17 +91,17 @@
           </select>
         </div>
 
-        <div class="form-group">
+        <div class="form-group axis-layout">
           <div class="inc-controls">
+            <span class="axis-name">Ancho</span>
             <button type="button" class="inc" data-target="pagesX" data-op="-">−</button>
-            <input type="number" id="pagesX" value="1" min="1"/>
-            <label for="pagesX">Hojas horiz.</label>
+            <input type="number" id="pagesX" value="1" min="1" aria-label="Número de hojas en ancho"/>
             <button type="button" class="inc" data-target="pagesX" data-op="+">+</button>
           </div>
           <div class="inc-controls">
+            <span class="axis-name">Alto</span>
             <button type="button" class="inc" data-target="pagesY" data-op="-">−</button>
-            <input type="number" id="pagesY" value="1" min="1"/>
-            <label for="pagesY">Hojas vert.</label>
+            <input type="number" id="pagesY" value="1" min="1" aria-label="Número de hojas en alto"/>
             <button type="button" class="inc" data-target="pagesY" data-op="+">+</button>
           </div>
         </div>

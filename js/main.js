@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let current = 1;
   const prevBtn = document.getElementById('prevBtn');
   const nextBtn = document.getElementById('nextBtn');
+  const loadingOverlay = document.getElementById('loadingOverlay');
 
   function show(n) {
     steps.forEach(s => s.classList.remove('active'));
@@ -52,6 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const openChk = document.getElementById('openPdf');
   const cPrev = document.getElementById('previewCanvas');
   const ctxP = cPrev.getContext('2d');
+
+  function setLoading(isLoading) {
+    loadingOverlay.classList.toggle('visible', isLoading);
+    loadingOverlay.setAttribute('aria-hidden', String(!isLoading));
+    nextBtn.disabled = isLoading;
+    prevBtn.disabled = isLoading;
+  }
 
   const sheets = {
     letter: { w: 216, h: 279 },
@@ -142,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pagesY = Math.max(1, +pYIn.value || 1);
     pXIn.value = pagesX;
     pYIn.value = pagesY;
-    resLab.textContent = `Páginas: ${pagesX}×${pagesY}`;
+    resLab.textContent = `Ancho: ${pagesX} · Alto: ${pagesY}`;
 
     const { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm } = getPosterGeometry();
 
@@ -297,6 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function generatePoster() {
     if (!img) return alert('Primero carga y recorta una imagen');
     drawPreview();
+    setLoading(true);
 
     try {
       const { jsPDF } = window.jspdf;
@@ -406,6 +415,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (openChk.checked) window.open(pdf.output('bloburl'));
     } catch (err) {
       alert('Error generando PDF: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
