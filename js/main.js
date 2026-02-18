@@ -1,119 +1,81 @@
 document.addEventListener('DOMContentLoaded', () => {
-
-
-  const steps   = [...document.querySelectorAll('.step')];
-  let   current = 1;
+  const TOTAL_STEPS = 4;
+  const steps = [...document.querySelectorAll('.step')];
+  let current = 1;
   const prevBtn = document.getElementById('prevBtn');
   const nextBtn = document.getElementById('nextBtn');
+
   function show(n) {
     steps.forEach(s => s.classList.remove('active'));
     document.querySelector(`.step[data-step="${n}"]`).classList.add('active');
-    prevBtn.style.display = n===1 ? 'none' : '';
-    nextBtn.textContent  = n===5 ? 'Generar y Guardar' : 'Siguiente';
+    prevBtn.style.display = n === 1 ? 'none' : '';
+    nextBtn.textContent = n === TOTAL_STEPS ? 'Generar y Guardar' : 'Siguiente';
   }
-  prevBtn.onclick = () => { if (current>1) show(--current); };
+
+  prevBtn.onclick = () => { if (current > 1) show(--current); };
   nextBtn.onclick = () => {
-    if (current<5) show(++current);
+    if (current < TOTAL_STEPS) show(++current);
     else generatePoster();
   };
   show(current);
 
-  // — Globals —
-  let img = null, pagesX=1, pagesY=1, cropper=null;
-  const fileIn   = document.getElementById('imageInput');
-  const imgPrev  = document.getElementById('imgPreview');
-  const cropBtn  = document.getElementById('cropBtn');
-  const sheetSz  = document.getElementById('sheetSize');
-  const orient   = document.getElementById('orientation');
-  const mT       = document.getElementById('marginTop');
-  const mL       = document.getElementById('marginLeft');
-  const mR       = document.getElementById('marginRight');
-  const mB       = document.getElementById('marginBottom');
-  const linkM    = document.getElementById('linkMargins');
-  const resetM   = document.getElementById('resetMarginsBtn');
-  const oW       = document.getElementById('overlapWidth');
-  const oH       = document.getElementById('overlapHeight');
-  const posBtns  = document.querySelectorAll('[data-pos]');
-  const pXIn     = document.getElementById('pagesX');
-  const pYIn     = document.getElementById('pagesY');
-  const incBtns  = document.querySelectorAll('.inc');
-  const resLab   = document.getElementById('resultLabel');
-  const keepAsp  = document.getElementById('keepAspect');
-  const alignIn  = document.getElementById('imageAlign');
+  let img = null;
+  let pagesX = 1;
+  let pagesY = 1;
+  let cropper = null;
+
+  const fileIn = document.getElementById('imageInput');
+  const imgPrev = document.getElementById('imgPreview');
+  const cropBtn = document.getElementById('cropBtn');
+  const sheetSz = document.getElementById('sheetSize');
+  const orient = document.getElementById('orientation');
+  const mT = document.getElementById('marginTop');
+  const mL = document.getElementById('marginLeft');
+  const mR = document.getElementById('marginRight');
+  const mB = document.getElementById('marginBottom');
+  const linkM = document.getElementById('linkMargins');
+  const resetM = document.getElementById('resetMarginsBtn');
+  const oW = document.getElementById('overlapWidth');
+  const oH = document.getElementById('overlapHeight');
+  const blankOverlap = document.getElementById('blankOverlap');
+  const pXIn = document.getElementById('pagesX');
+  const pYIn = document.getElementById('pagesY');
+  const incBtns = document.querySelectorAll('.inc');
+  const resLab = document.getElementById('resultLabel');
+  const keepAsp = document.getElementById('keepAspect');
+  const alignIn = document.getElementById('imageAlign');
   const alignLbl = document.getElementById('imageAlignLabel');
   const alignGrp = document.getElementById('alignmentGroup');
-  const showG    = document.getElementById('showGuides');
-  const showO    = document.getElementById('showOverlap');
-  const openChk  = document.getElementById('openPdf');
-  const cMargin  = document.getElementById('marginCanvas');
-  const cOver    = document.getElementById('overlapCanvas');
-  const cPrev    = document.getElementById('previewCanvas');
-  const ctxM     = cMargin.getContext('2d');
-  const ctxO     = cOver.getContext('2d');
-  const ctxP     = cPrev.getContext('2d');
+  const showG = document.getElementById('showGuides');
+  const showO = document.getElementById('showOverlap');
+  const openChk = document.getElementById('openPdf');
+  const cPrev = document.getElementById('previewCanvas');
+  const ctxP = cPrev.getContext('2d');
 
   const sheets = {
-    letter: { w:216, h:279 },
-    A4:     { w:210, h:297 },
-    tabloid:{ w:279, h:432 }
+    letter: { w: 216, h: 279 },
+    A4: { w: 210, h: 297 },
+    tabloid: { w: 279, h: 432 }
   };
 
+  function getSheetSizeMm() {
+    const { w: sw0, h: sh0 } = sheets[sheetSz.value];
+    return orient.value === 'landscape' ? { sheetW: sh0, sheetH: sw0 } : { sheetW: sw0, sheetH: sh0 };
+  }
 
-  // – Paso 1:
-  fileIn.onchange = () => {
-    const f = fileIn.files[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      const url = e.target.result;
-      imgPrev.src = url;
-      // init Cropper
-      if (cropper) cropper.destroy();
-      cropper = new Cropper(imgPrev, {
-        viewMode: 1, autoCropArea: 1,
-        background: false, movable: true, zoomable: true
-      });
-      // pre-asigna img para preview
-      img = new Image();
-      img.onload = () => {
-        drawMargin();
-        drawOverlap();
-        drawPreview();
-      };
-      img.src = url;
-    };
-    reader.readAsDataURL(f);
-  };
+  function getPosterGeometry() {
+    const { sheetW, sheetH } = getSheetSizeMm();
+    const overlapW = Math.max(0, +oW.value * 10);
+    const overlapH = Math.max(0, +oH.value * 10);
+    const blank = blankOverlap.checked;
 
+    const totalWmm = blank ? pagesX * sheetW : pagesX * sheetW - overlapW * (pagesX - 1);
+    const totalHmm = blank ? pagesY * sheetH : pagesY * sheetH - overlapH * (pagesY - 1);
 
-  // – Paso 1b: cut –
+    return { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm };
+  }
 
-  cropBtn.onclick = () => {
-    if (!cropper) return;
-    const canvasCrop = cropper.getCroppedCanvas();
-    const url        = canvasCrop.toDataURL('image/png');
-    cropper.destroy();
-    cropper = null;
-    imgPrev.src = url;
-    img = new Image();
-    img.onload = () => {
-      drawMargin();
-      drawOverlap();
-      drawPreview();
-    };
-    img.src = url;
-  };
-
-
-  // – Paso 2
-
-  resetM.onclick = () => {
-    mT.value = mL.value = mR.value = mB.value = 0;
-    drawMargin();
-    drawPreview();
-  };
-
-  function syncMarginsFrom(sourceInput){
+  function syncMarginsFrom(sourceInput) {
     if (!linkM.checked) return;
     const v = sourceInput.value;
     [mT, mL, mR, mB].forEach(input => {
@@ -121,64 +83,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-
-  // – Paso 2: Preview 
-
-  function drawMargin(){
-    const {w:sw0,h:sh0} = sheets[sheetSz.value];
-    let sw=sw0, sh=sh0;
-    if (orient.value==='landscape') [sw,sh]=[sh,sw];
-    const sx = cMargin.width/sw, sy = cMargin.height/sh;
-    const mt = +mT.value*10, ml = +mL.value*10,
-          mr = +mR.value*10, mb = +mB.value*10;
-    ctxM.clearRect(0,0,cMargin.width,cMargin.height);
-    ctxM.fillStyle='rgba(255,0,0,0.3)';
-    ctxM.fillRect(0,0,cMargin.width, mt*sy);
-    ctxM.fillRect(0,cMargin.height-mb*sy, cMargin.width, mb*sy);
-    ctxM.fillRect(0,0, ml*sx, cMargin.height);
-    ctxM.fillRect(cMargin.width-mr*sx,0, mr*sx, cMargin.height);
-  }
-
-  // – Paso 3: Preview solapado –
-
-  let overlapPos='top-left';
-  posBtns.forEach(b=>{
-    b.onclick = () => { overlapPos = b.dataset.pos; drawOverlap(); };
-  });
-  function drawOverlap(){
-    const {w:sw0,h:sh0} = sheets[sheetSz.value];
-    let sw=sw0, sh=sh0;
-    if (orient.value==='landscape') [sw,sh]=[sh,sw];
-    const sx = cOver.width/sw, sy = cOver.height/sh;
-    const ow = +oW.value*10, oh = +oH.value*10;
-    ctxO.clearRect(0,0,cOver.width,cOver.height);
-    ctxO.fillStyle='rgba(255,0,0,0.3)';
-    if (overlapPos.includes('top'))
-      ctxO.fillRect(0,0,cOver.width, oh*sy);
-    if (overlapPos.includes('bottom'))
-      ctxO.fillRect(0,cOver.height-oh*sy, cOver.width, oh*sy);
-    if (overlapPos.includes('left'))
-      ctxO.fillRect(0,0, ow*sx, cOver.height);
-    if (overlapPos.includes('right'))
-      ctxO.fillRect(cOver.width-ow*sx,0, ow*sx, cOver.height);
-  }
-
-  // – Paso 4:
-
-  function updateAlignmentControl(){
+  function updateAlignmentControl() {
     alignLbl.textContent = 'Alineación de imagen:';
-
     alignGrp.style.display = keepAsp.checked ? '' : 'none';
   }
 
-  function getOffset(spare, mode){
+  function getOffset(spare, mode) {
     if (spare <= 0) return 0;
     if (mode === 'start') return 0;
     if (mode === 'end') return spare;
     return spare / 2;
   }
 
-  function getAlignmentModes(){
+  function getAlignmentModes() {
     switch (alignIn.value) {
       case 'top':
         return { horizontal: 'center', vertical: 'start' };
@@ -193,64 +110,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function getImagePlacement(totalWmm, totalHmm){
-    if (!keepAsp.checked){
-      return { x:0, y:0, w:totalWmm, h:totalHmm };
+  function getImagePlacement(totalWmm, totalHmm) {
+    if (!keepAsp.checked) {
+      return { x: 0, y: 0, w: totalWmm, h: totalHmm };
     }
 
     const imgRatio = img.naturalWidth / img.naturalHeight;
     const posterRatio = totalWmm / totalHmm;
     const align = getAlignmentModes();
 
-    if (imgRatio > posterRatio){
+    if (imgRatio > posterRatio) {
       const w = totalWmm;
       const h = w / imgRatio;
       const spareY = totalHmm - h;
       const y = getOffset(spareY, align.vertical);
-      return { x:0, y, w, h };
+      return { x: 0, y, w, h };
     }
 
     const h = totalHmm;
     const w = h * imgRatio;
     const spareX = totalWmm - w;
     const x = getOffset(spareX, align.horizontal);
-    return { x, y:0, w, h };
+    return { x, y: 0, w, h };
   }
-  function drawPreview(){
+
+  function drawPreview() {
     if (!img) return;
-    const {w:sw0,h:sh0} = sheets[sheetSz.value];
-    let sw=sw0, sh=sh0;
-    if (orient.value==='landscape') [sw,sh]=[sh,sw];
-    const overlapW = +oW.value*10,
-          overlapH = +oH.value*10;
 
-    
-    pagesX = Math.max(1, +pXIn.value);
-    pagesY = Math.max(1, +pYIn.value);
-
+    pagesX = Math.max(1, +pXIn.value || 1);
+    pagesY = Math.max(1, +pYIn.value || 1);
     pXIn.value = pagesX;
     pYIn.value = pagesY;
     resLab.textContent = `Páginas: ${pagesX}×${pagesY}`;
 
+    const { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm } = getPosterGeometry();
 
-    const totalWmm = pagesX*sw - overlapW*(pagesX-1);
-    const totalHmm = pagesY*sh - overlapH*(pagesY-1);
-    const PREV_W = 400;
-    const PREV_H = Math.round(PREV_W * totalHmm / totalWmm);
-    cPrev.width  = PREV_W;
+    const PREV_W = 460;
+    const PREV_H = Math.max(120, Math.round(PREV_W * totalHmm / totalWmm));
+    cPrev.width = PREV_W;
     cPrev.height = PREV_H;
 
-
-    const tileW = PREV_W/pagesX,
-          tileH = PREV_H/pagesY;
-
-    const placement = getImagePlacement(totalWmm, totalHmm);
     const scaleX = PREV_W / totalWmm;
     const scaleY = PREV_H / totalHmm;
+    const tileW = sheetW * scaleX;
+    const tileH = sheetH * scaleY;
+    const stepX = blank ? tileW : (sheetW - overlapW) * scaleX;
+    const stepY = blank ? tileH : (sheetH - overlapH) * scaleY;
 
-    ctxP.clearRect(0,0,PREV_W,PREV_H);
+    const mt = Math.max(0, +mT.value * 10);
+    const ml = Math.max(0, +mL.value * 10);
+    const mr = Math.max(0, +mR.value * 10);
+    const mb = Math.max(0, +mB.value * 10);
+
+    const placement = getImagePlacement(totalWmm, totalHmm);
+
+    ctxP.clearRect(0, 0, PREV_W, PREV_H);
     ctxP.fillStyle = '#fff';
-    ctxP.fillRect(0,0,PREV_W,PREV_H);
+    ctxP.fillRect(0, 0, PREV_W, PREV_H);
+
     ctxP.drawImage(
       img,
       placement.x * scaleX,
@@ -259,95 +176,95 @@ document.addEventListener('DOMContentLoaded', () => {
       placement.h * scaleY
     );
 
-
-    // 5) Cuadrícula
-    ctxP.save();
-    ctxP.strokeStyle='#007bff';
-    ctxP.setLineDash([4,2]);
-    for(let i=1;i<pagesX;i++){
-      const X=i*tileW;
-      ctxP.beginPath(); ctxP.moveTo(X,0); ctxP.lineTo(X,PREV_H); ctxP.stroke();
-    }
-    for(let j=1;j<pagesY;j++){
-      const Y=j*tileH;
-      ctxP.beginPath(); ctxP.moveTo(0,Y); ctxP.lineTo(PREV_W,Y); ctxP.stroke();
-    }
-    ctxP.restore();
-
-    // 6) Solapado
-    if (showO.checked){
-      const owPx = overlapW/sw*tileW,
-            ohPx = overlapH/sh*tileH;
+    if (showO.checked) {
       ctxP.save();
-      ctxP.fillStyle='rgba(255,0,0,0.3)';
-      for(let i=1;i<pagesX;i++){
-        const X=i*tileW - owPx/2;
-        ctxP.fillRect(X,0,owPx,PREV_H);
+      ctxP.fillStyle = 'rgba(0, 128, 0, 0.15)';
+      if (!blank) {
+        for (let i = 1; i < pagesX; i++) {
+          const x = i * stepX;
+          const owPx = overlapW * scaleX;
+          ctxP.fillRect(x - owPx / 2, 0, owPx, PREV_H);
+        }
+        for (let j = 1; j < pagesY; j++) {
+          const y = j * stepY;
+          const ohPx = overlapH * scaleY;
+          ctxP.fillRect(0, y - ohPx / 2, PREV_W, ohPx);
+        }
+      } else {
+        for (let i = 0; i < pagesX - 1; i++) {
+          const x = (i + 1) * stepX - overlapW * scaleX;
+          ctxP.fillRect(x, 0, overlapW * scaleX, PREV_H);
+        }
+        for (let j = 0; j < pagesY - 1; j++) {
+          const y = (j + 1) * stepY - overlapH * scaleY;
+          ctxP.fillRect(0, y, PREV_W, overlapH * scaleY);
+        }
       }
-      for(let j=1;j<pagesY;j++){
-        const Y=j*tileH - ohPx/2;
-        ctxP.fillRect(0,Y,PREV_W,ohPx);
+      ctxP.restore();
+    }
+
+    if (showG.checked) {
+      ctxP.save();
+      ctxP.setLineDash([5, 3]);
+
+      for (let y = 0; y < pagesY; y++) {
+        for (let x = 0; x < pagesX; x++) {
+          const tileX = x * stepX;
+          const tileY = y * stepY;
+
+          const mLeftPx = Math.min(ml * scaleX, tileW / 2);
+          const mRightPx = Math.min(mr * scaleX, tileW / 2);
+          const mTopPx = Math.min(mt * scaleY, tileH / 2);
+          const mBottomPx = Math.min(mb * scaleY, tileH / 2);
+
+          ctxP.strokeStyle = '#cf1b1b';
+          ctxP.strokeRect(
+            tileX + mLeftPx,
+            tileY + mTopPx,
+            Math.max(1, tileW - mLeftPx - mRightPx),
+            Math.max(1, tileH - mTopPx - mBottomPx)
+          );
+
+          ctxP.strokeStyle = '#0f9d58';
+          if (!blank) {
+            if (x > 0 && overlapW > 0) {
+              ctxP.beginPath();
+              ctxP.moveTo(tileX, tileY);
+              ctxP.lineTo(tileX, tileY + tileH);
+              ctxP.stroke();
+            }
+            if (y > 0 && overlapH > 0) {
+              ctxP.beginPath();
+              ctxP.moveTo(tileX, tileY);
+              ctxP.lineTo(tileX + tileW, tileY);
+              ctxP.stroke();
+            }
+          } else {
+            if (x < pagesX - 1 && overlapW > 0) {
+              const gx = tileX + tileW - overlapW * scaleX;
+              ctxP.beginPath();
+              ctxP.moveTo(gx, tileY);
+              ctxP.lineTo(gx, tileY + tileH);
+              ctxP.stroke();
+            }
+            if (y < pagesY - 1 && overlapH > 0) {
+              const gy = tileY + tileH - overlapH * scaleY;
+              ctxP.beginPath();
+              ctxP.moveTo(tileX, gy);
+              ctxP.lineTo(tileX + tileW, gy);
+              ctxP.stroke();
+            }
+          }
+        }
       }
+
       ctxP.restore();
     }
   }
 
-
-
-  incBtns.forEach(b=>{
-    b.onclick = ()=>{
-      const t = document.getElementById(b.dataset.target);
-      let   v = +t.value;
-      v = b.dataset.op==='+'? v+1 : Math.max(1,v-1);
-      t.value = v;
-      drawPreview();
-    };
-  });
-
-
-
-
-  const previewInputs = [
-    sheetSz, orient,
-    mT,mL,mR,mB,
-    oW,oH,
-    pXIn,pYIn,
-    keepAsp, alignIn,
-    showG,showO
-  ];
-
-  function handlePreviewControlChange(e){
-    if (e.target === orient || e.target === keepAsp) {
-      updateAlignmentControl();
-    }
-    if ([mT,mL,mR,mB].includes(e.target)) {
-      syncMarginsFrom(e.target);
-    }
-    drawMargin();
-    drawOverlap();
-    drawPreview();
-  }
-
-  previewInputs.forEach(el=> {
-    el.addEventListener('input', handlePreviewControlChange);
-    el.addEventListener('change', handlePreviewControlChange);
-  });
-
-  linkM.addEventListener('change', () => {
-    if (linkM.checked) syncMarginsFrom(mT);
-    drawMargin();
-    drawPreview();
-  });
-
-  updateAlignmentControl();
-
-
-
-  // — Paso 5: PDF —
-
-  function createPosterRaster(totalWmm, totalHmm, placement){
-    const posterPxWidth = Math.max(1, Math.ceil(totalWmm * 12));
-    const posterPxHeight = Math.max(1, Math.ceil(totalHmm * 12));
+  function createPosterRaster(totalWmm, totalHmm, placement) {
+    const posterPxWidth = Math.max(1, Math.ceil(totalWmm * 14));
+    const posterPxHeight = Math.max(1, Math.ceil(totalHmm * 14));
     const canvas = document.createElement('canvas');
     canvas.width = posterPxWidth;
     canvas.height = posterPxHeight;
@@ -357,48 +274,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ctx.drawImage(
       img,
-      placement.x / totalWmm * posterPxWidth,
-      placement.y / totalHmm * posterPxHeight,
-      placement.w / totalWmm * posterPxWidth,
-      placement.h / totalHmm * posterPxHeight
+      (placement.x / totalWmm) * posterPxWidth,
+      (placement.y / totalHmm) * posterPxHeight,
+      (placement.w / totalWmm) * posterPxWidth,
+      (placement.h / totalHmm) * posterPxHeight
     );
 
     return canvas;
   }
 
-  async function generatePoster(){
+  async function generatePoster() {
     if (!img) return alert('Primero carga y recorta una imagen');
     drawPreview();
+
     try {
       const { jsPDF } = window.jspdf;
+      const { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm } = getPosterGeometry();
+      const mt = Math.max(0, +mT.value * 10);
+      const ml = Math.max(0, +mL.value * 10);
+      const mr = Math.max(0, +mR.value * 10);
+      const mb = Math.max(0, +mB.value * 10);
+
       const pdf = new jsPDF({
-        unit:'mm',
-        format:[ sheets[sheetSz.value].w, sheets[sheetSz.value].h ],
+        unit: 'mm',
+        format: [sheets[sheetSz.value].w, sheets[sheetSz.value].h],
         orientation: orient.value
       });
-      const { w:baseW, h:baseH } = sheets[sheetSz.value];
-      const sheetW = orient.value === 'landscape' ? baseH : baseW;
-      const sheetH = orient.value === 'landscape' ? baseW : baseH;
-      const overlapW = +oW.value * 10;
-      const overlapH = +oH.value * 10;
-      const totalWmm = pagesX * sheetW - overlapW * (pagesX - 1);
-      const totalHmm = pagesY * sheetH - overlapH * (pagesY - 1);
+
       const placement = getImagePlacement(totalWmm, totalHmm);
       const posterCanvas = createPosterRaster(totalWmm, totalHmm, placement);
       const mmToPxX = posterCanvas.width / totalWmm;
       const mmToPxY = posterCanvas.height / totalHmm;
 
-      let idx=0;
-      for(let y=0;y<pagesY;y++){
-        for(let x=0;x<pagesX;x++){
+      let idx = 0;
+      for (let y = 0; y < pagesY; y++) {
+        for (let x = 0; x < pagesX; x++) {
           if (idx++) pdf.addPage();
-          const sx = x * (sheetW - overlapW);
-          const sy = y * (sheetH - overlapH);
 
-          const srcX = Math.round(sx * mmToPxX);
-          const srcY = Math.round(sy * mmToPxY);
-          const srcW = Math.round(sheetW * mmToPxX);
-          const srcH = Math.round(sheetH * mmToPxY);
+          const sx = blank ? x * sheetW : x * (sheetW - overlapW);
+          const sy = blank ? y * sheetH : y * (sheetH - overlapH);
+
+          const srcX0 = Math.floor(sx * mmToPxX);
+          const srcY0 = Math.floor(sy * mmToPxY);
+          const srcX1 = Math.ceil((sx + sheetW) * mmToPxX);
+          const srcY1 = Math.ceil((sy + sheetH) * mmToPxY);
+          const srcW = Math.max(1, srcX1 - srcX0);
+          const srcH = Math.max(1, srcY1 - srcY0);
 
           const tileCanvas = document.createElement('canvas');
           tileCanvas.width = srcW;
@@ -406,46 +327,141 @@ document.addEventListener('DOMContentLoaded', () => {
           const tileCtx = tileCanvas.getContext('2d');
           tileCtx.fillStyle = '#fff';
           tileCtx.fillRect(0, 0, srcW, srcH);
-          tileCtx.drawImage(
-            posterCanvas,
-            srcX,
-            srcY,
-            srcW,
-            srcH,
-            0,
-            0,
-            srcW,
-            srcH
-          );
+          tileCtx.drawImage(posterCanvas, srcX0, srcY0, srcW, srcH, 0, 0, srcW, srcH);
 
-          pdf.addImage(
-            tileCanvas,
-            'PNG',
-            0,
-            0,
-            sheetW,
-            sheetH
-          );
-
-          if (showG.checked){
-            pdf.setLineDash([3,3],0);
-            pdf.setDrawColor(255,0,0);
-            pdf.rect(0,0,sheetW,sheetH);
+          if (blank && showO.checked) {
+            tileCtx.fillStyle = '#fff';
+            if (x < pagesX - 1 && overlapW > 0) {
+              tileCtx.fillRect((srcW * (sheetW - overlapW)) / sheetW, 0, (srcW * overlapW) / sheetW, srcH);
+            }
+            if (y < pagesY - 1 && overlapH > 0) {
+              tileCtx.fillRect(0, (srcH * (sheetH - overlapH)) / sheetH, srcW, (srcH * overlapH) / sheetH);
+            }
           }
 
-          if (showO.checked){
-            pdf.setFillColor(255,220,220);
-            if (x > 0) pdf.rect(0, 0, overlapW, sheetH, 'F');
-            if (x < pagesX - 1) pdf.rect(sheetW - overlapW, 0, overlapW, sheetH, 'F');
-            if (y > 0) pdf.rect(0, 0, sheetW, overlapH, 'F');
-            if (y < pagesY - 1) pdf.rect(0, sheetH - overlapH, sheetW, overlapH, 'F');
+          pdf.addImage(tileCanvas.toDataURL('image/png'), 'PNG', 0, 0, sheetW, sheetH, undefined, 'FAST');
+
+          if (showO.checked) {
+            pdf.setFillColor(210, 245, 220);
+            if (!blank) {
+              if (x > 0) pdf.rect(0, 0, overlapW, sheetH, 'F');
+              if (x < pagesX - 1) pdf.rect(sheetW - overlapW, 0, overlapW, sheetH, 'F');
+              if (y > 0) pdf.rect(0, 0, sheetW, overlapH, 'F');
+              if (y < pagesY - 1) pdf.rect(0, sheetH - overlapH, sheetW, overlapH, 'F');
+            } else {
+              if (x < pagesX - 1) pdf.rect(sheetW - overlapW, 0, overlapW, sheetH, 'F');
+              if (y < pagesY - 1) pdf.rect(0, sheetH - overlapH, sheetW, overlapH, 'F');
+            }
+          }
+
+          if (showG.checked) {
+            pdf.setLineDash([3, 3], 0);
+            pdf.setDrawColor(207, 27, 27);
+            pdf.rect(
+              Math.min(ml, sheetW / 2),
+              Math.min(mt, sheetH / 2),
+              Math.max(1, sheetW - Math.min(ml, sheetW / 2) - Math.min(mr, sheetW / 2)),
+              Math.max(1, sheetH - Math.min(mt, sheetH / 2) - Math.min(mb, sheetH / 2))
+            );
+
+            pdf.setDrawColor(15, 157, 88);
+            if (!blank) {
+              if (x > 0 && overlapW > 0) pdf.line(0, 0, 0, sheetH);
+              if (y > 0 && overlapH > 0) pdf.line(0, 0, sheetW, 0);
+            } else {
+              if (x < pagesX - 1 && overlapW > 0) pdf.line(sheetW - overlapW, 0, sheetW - overlapW, sheetH);
+              if (y < pagesY - 1 && overlapH > 0) pdf.line(0, sheetH - overlapH, sheetW, sheetH - overlapH);
+            }
           }
         }
       }
+
       pdf.save('poster.pdf');
       if (openChk.checked) window.open(pdf.output('bloburl'));
-    } catch(err){
-      alert('Error generando PDF: '+err.message);
+    } catch (err) {
+      alert('Error generando PDF: ' + err.message);
     }
   }
+
+  fileIn.onchange = () => {
+    const f = fileIn.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const url = e.target.result;
+      imgPrev.src = url;
+      if (cropper) cropper.destroy();
+      cropper = new Cropper(imgPrev, {
+        viewMode: 1,
+        autoCropArea: 1,
+        background: false,
+        movable: true,
+        zoomable: true
+      });
+      img = new Image();
+      img.onload = drawPreview;
+      img.src = url;
+    };
+    reader.readAsDataURL(f);
+  };
+
+  cropBtn.onclick = () => {
+    if (!cropper) return;
+    const canvasCrop = cropper.getCroppedCanvas();
+    const url = canvasCrop.toDataURL('image/png');
+    cropper.destroy();
+    cropper = null;
+    imgPrev.src = url;
+    img = new Image();
+    img.onload = drawPreview;
+    img.src = url;
+  };
+
+  resetM.onclick = () => {
+    mT.value = mL.value = mR.value = mB.value = 0;
+    drawPreview();
+  };
+
+  incBtns.forEach(b => {
+    b.onclick = () => {
+      const t = document.getElementById(b.dataset.target);
+      let v = +t.value;
+      v = b.dataset.op === '+' ? v + 1 : Math.max(1, v - 1);
+      t.value = v;
+      drawPreview();
+    };
+  });
+
+  const previewInputs = [
+    sheetSz,
+    orient,
+    mT, mL, mR, mB,
+    oW, oH,
+    blankOverlap,
+    pXIn, pYIn,
+    keepAsp, alignIn,
+    showG, showO
+  ];
+
+  function handlePreviewControlChange(e) {
+    if (e.target === orient || e.target === keepAsp) {
+      updateAlignmentControl();
+    }
+    if ([mT, mL, mR, mB].includes(e.target)) {
+      syncMarginsFrom(e.target);
+    }
+    drawPreview();
+  }
+
+  previewInputs.forEach(el => {
+    el.addEventListener('input', handlePreviewControlChange);
+    el.addEventListener('change', handlePreviewControlChange);
+  });
+
+  linkM.addEventListener('change', () => {
+    if (linkM.checked) syncMarginsFrom(mT);
+    drawPreview();
+  });
+
+  updateAlignmentControl();
 });
