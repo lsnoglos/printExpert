@@ -52,6 +52,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const blankOverlap = document.getElementById('blankOverlap');
   const pXIn = document.getElementById('pagesX');
   const pYIn = document.getElementById('pagesY');
+  const targetWidthCmIn = document.getElementById('targetWidthCm');
+  const targetHeightCmIn = document.getElementById('targetHeightCm');
+  const lockTargetToPages = document.getElementById('lockTargetToPages');
+  const usePrinterBorder = document.getElementById('usePrinterBorder');
+  const printerBorderCmIn = document.getElementById('printerBorderCm');
   const incBtns = document.querySelectorAll('.inc');
   const resLab = document.getElementById('resultLabel');
   const keepAsp = document.getElementById('keepAspect');
@@ -104,6 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
       blankOverlap: true,
       pagesX: '1',
       pagesY: '1',
+      targetWidthCm: '21.6',
+      targetHeightCm: '27.9',
+      lockTargetToPages: true,
+      usePrinterBorder: true,
+      printerBorderCm: '0.2',
       keepAspect: true,
       imageAlign: 'center',
       showGuides: false,
@@ -129,6 +139,11 @@ document.addEventListener('DOMContentLoaded', () => {
       blankOverlap: blankOverlap.checked,
       pagesX: pXIn.value,
       pagesY: pYIn.value,
+      targetWidthCm: targetWidthCmIn.value,
+      targetHeightCm: targetHeightCmIn.value,
+      lockTargetToPages: lockTargetToPages.checked,
+      usePrinterBorder: usePrinterBorder.checked,
+      printerBorderCm: printerBorderCmIn.value,
       keepAspect: keepAsp.checked,
       imageAlign: alignIn.value,
       showGuides: showG.checked,
@@ -171,8 +186,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const totalWmm = pagesX * sheetW - overlapW * (pagesX - 1);
     const totalHmm = pagesY * sheetH - overlapH * (pagesY - 1);
+    const printerBorderMm = usePrinterBorder.checked ? Math.max(0, (+printerBorderCmIn.value || 0) * 10) : 0;
+    const effTileW = Math.max(0, sheetW - printerBorderMm * 2);
+    const effTileH = Math.max(0, sheetH - printerBorderMm * 2);
+    const mountedWmm = pagesX * effTileW - overlapW * (pagesX - 1);
+    const mountedHmm = pagesY * effTileH - overlapH * (pagesY - 1);
 
-    return { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm };
+    return { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm, printerBorderMm, mountedWmm, mountedHmm };
+  }
+
+  function pagesFromTarget(targetMm, sheetMm, overlapMm) {
+    const safeTarget = Math.max(0, targetMm || 0);
+    if (sheetMm <= overlapMm) return 1;
+    if (safeTarget <= sheetMm) return 1;
+    return Math.max(1, Math.ceil((safeTarget - overlapMm) / (sheetMm - overlapMm)));
+  }
+
+  function syncTargetInputsFromPages(geometry) {
+    targetWidthCmIn.value = (geometry.mountedWmm / 10).toFixed(2);
+    targetHeightCmIn.value = (geometry.mountedHmm / 10).toFixed(2);
+  }
+
+  function syncPagesFromTargetInputs() {
+    const { sheetW, sheetH, overlapW, overlapH, printerBorderMm } = getPosterGeometry();
+    const targetWmm = Math.max(0, (+targetWidthCmIn.value || 0) * 10);
+    const targetHmm = Math.max(0, (+targetHeightCmIn.value || 0) * 10);
+    const effectiveSheetW = Math.max(0, sheetW - printerBorderMm * 2);
+    const effectiveSheetH = Math.max(0, sheetH - printerBorderMm * 2);
+
+    pagesX = pagesFromTarget(targetWmm, effectiveSheetW, overlapW);
+    pagesY = pagesFromTarget(targetHmm, effectiveSheetH, overlapH);
+    pXIn.value = pagesX;
+    pYIn.value = pagesY;
   }
 
   function syncMarginsFrom(sourceInput) {
@@ -241,9 +286,11 @@ document.addEventListener('DOMContentLoaded', () => {
     pagesY = Math.max(1, +pYIn.value || 1);
     pXIn.value = pagesX;
     pYIn.value = pagesY;
-    resLab.textContent = `Ancho: ${pagesX} · Alto: ${pagesY}`;
+    const { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm, mountedWmm, mountedHmm } = getPosterGeometry();
 
-    const { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm } = getPosterGeometry();
+    resLab.innerHTML = `Hojas → Ancho: <strong>${pagesX}</strong> · Alto: <strong>${pagesY}</strong><br>
+      Tamaño bruto montado: ${(totalWmm / 10).toFixed(2)} × ${(totalHmm / 10).toFixed(2)} cm<br>
+      Tamaño útil (considerando borde de impresión): ${(mountedWmm / 10).toFixed(2)} × ${(mountedHmm / 10).toFixed(2)} cm`;
 
     const PREV_W = 460;
     const PREV_H = Math.max(120, Math.round((PREV_W * totalHmm) / totalWmm));
@@ -403,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const { jsPDF } = window.jspdf;
-      const { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm } = getPosterGeometry();
+      const { sheetW, sheetH, overlapW, overlapH, blank, totalWmm, totalHmm, printerBorderMm } = getPosterGeometry();
       const mt = Math.max(0, +mT.value * 10);
       const ml = Math.max(0, +mL.value * 10);
       const mr = Math.max(0, +mR.value * 10);
@@ -460,7 +507,11 @@ document.addEventListener('DOMContentLoaded', () => {
             dstBoundsY.size
           );
 
-          pdf.addImage(tileCanvas.toDataURL('image/png'), 'PNG', 0, 0, sheetW, sheetH, undefined, 'FAST');
+          const printAreaX = Math.min(printerBorderMm, sheetW / 2);
+          const printAreaY = Math.min(printerBorderMm, sheetH / 2);
+          const printAreaW = Math.max(1, sheetW - printAreaX * 2);
+          const printAreaH = Math.max(1, sheetH - printAreaY * 2);
+          pdf.addImage(tileCanvas.toDataURL('image/png'), 'PNG', printAreaX, printAreaY, printAreaW, printAreaH, undefined, 'FAST');
 
           if (showO.checked) {
             pdf.setLineDash(styledG.checked ? [2, 2] : [], 0);
@@ -533,6 +584,11 @@ document.addEventListener('DOMContentLoaded', () => {
     blankOverlap.checked = state.blankOverlap;
     pXIn.value = state.pagesX;
     pYIn.value = state.pagesY;
+    targetWidthCmIn.value = state.targetWidthCm;
+    targetHeightCmIn.value = state.targetHeightCm;
+    lockTargetToPages.checked = state.lockTargetToPages;
+    usePrinterBorder.checked = state.usePrinterBorder;
+    printerBorderCmIn.value = state.printerBorderCm;
     keepAsp.checked = state.keepAspect;
     alignIn.value = state.imageAlign;
     showG.checked = state.showGuides;
@@ -574,6 +630,11 @@ document.addEventListener('DOMContentLoaded', () => {
       blankOverlap.checked = !!state.blankOverlap;
       pXIn.value = state.pagesX;
       pYIn.value = state.pagesY;
+      targetWidthCmIn.value = state.targetWidthCm;
+      targetHeightCmIn.value = state.targetHeightCm;
+      lockTargetToPages.checked = !!state.lockTargetToPages;
+      usePrinterBorder.checked = !!state.usePrinterBorder;
+      printerBorderCmIn.value = state.printerBorderCm;
       keepAsp.checked = !!state.keepAspect;
       alignIn.value = state.imageAlign;
       showG.checked = !!state.showGuides;
@@ -649,6 +710,9 @@ document.addEventListener('DOMContentLoaded', () => {
       let v = +t.value;
       v = b.dataset.op === '+' ? v + 1 : Math.max(1, v - 1);
       t.value = v;
+      if (lockTargetToPages.checked) {
+        syncTargetInputsFromPages(getPosterGeometry());
+      }
       drawPreview();
       saveState();
     };
@@ -666,6 +730,11 @@ document.addEventListener('DOMContentLoaded', () => {
     blankOverlap,
     pXIn,
     pYIn,
+    targetWidthCmIn,
+    targetHeightCmIn,
+    lockTargetToPages,
+    usePrinterBorder,
+    printerBorderCmIn,
     keepAsp,
     alignIn,
     showG,
@@ -681,6 +750,35 @@ document.addEventListener('DOMContentLoaded', () => {
     if ([mT, mL, mR, mB].includes(e.target)) {
       syncMarginsFrom(e.target);
     }
+    if ([targetWidthCmIn, targetHeightCmIn].includes(e.target) && !lockTargetToPages.checked) {
+      syncPagesFromTargetInputs();
+    }
+
+    if ([pXIn, pYIn].includes(e.target) && lockTargetToPages.checked) {
+      syncTargetInputsFromPages(getPosterGeometry());
+    }
+
+    if ((e.target === usePrinterBorder || e.target === printerBorderCmIn) && lockTargetToPages.checked) {
+      syncTargetInputsFromPages(getPosterGeometry());
+    }
+
+    if (e.target === lockTargetToPages) {
+      if (lockTargetToPages.checked) {
+        syncTargetInputsFromPages(getPosterGeometry());
+      } else {
+        syncPagesFromTargetInputs();
+      }
+    }
+
+
+    if (lockTargetToPages.checked && ![targetWidthCmIn, targetHeightCmIn, lockTargetToPages].includes(e.target)) {
+      syncTargetInputsFromPages(getPosterGeometry());
+    }
+
+    if (!lockTargetToPages.checked && [sheetSz, orient, oW, oH, usePrinterBorder, printerBorderCmIn].includes(e.target)) {
+      syncPagesFromTargetInputs();
+    }
+
     drawPreview();
     saveState();
   }
@@ -707,6 +805,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   hydrateState();
+  if (lockTargetToPages.checked) {
+    syncTargetInputsFromPages(getPosterGeometry());
+  } else {
+    syncPagesFromTargetInputs();
+  }
   updateAlignmentControl();
   show(current);
   saveState();
