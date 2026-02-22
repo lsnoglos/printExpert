@@ -60,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const incBtns = document.querySelectorAll('.inc');
   const resLab = document.getElementById('resultLabel');
   const keepAsp = document.getElementById('keepAspect');
+  const fillImage = document.getElementById('fillImage');
   const alignIn = document.getElementById('imageAlign');
   const alignLbl = document.getElementById('imageAlignLabel');
   const alignGrp = document.getElementById('alignmentGroup');
@@ -115,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       usePrinterBorder: true,
       printerBorderCm: '0.2',
       keepAspect: true,
+      fillImage: false,
       imageAlign: 'center',
       showGuides: false,
       styledGuides: true,
@@ -145,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
       usePrinterBorder: usePrinterBorder.checked,
       printerBorderCm: printerBorderCmIn.value,
       keepAspect: keepAsp.checked,
+      fillImage: fillImage.checked,
       imageAlign: alignIn.value,
       showGuides: showG.checked,
       styledGuides: styledG.checked,
@@ -233,6 +236,21 @@ document.addEventListener('DOMContentLoaded', () => {
     alignGrp.style.display = keepAsp.checked ? '' : 'none';
   }
 
+  function updateDimensionInputLocks() {
+    const lockedToPages = lockTargetToPages.checked;
+    targetWidthCmIn.disabled = lockedToPages;
+    targetHeightCmIn.disabled = lockedToPages;
+
+    pXIn.disabled = !lockedToPages;
+    pYIn.disabled = !lockedToPages;
+
+    incBtns.forEach(btn => {
+      if (btn.dataset.target === 'pagesX' || btn.dataset.target === 'pagesY') {
+        btn.disabled = !lockedToPages;
+      }
+    });
+  }
+
   function getOffset(spare, mode) {
     if (spare <= 0) return 0;
     if (mode === 'start') return 0;
@@ -263,6 +281,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const imgRatio = img.naturalWidth / img.naturalHeight;
     const posterRatio = totalWmm / totalHmm;
     const align = getAlignmentModes();
+
+    if (fillImage.checked) {
+      if (imgRatio > posterRatio) {
+        const h = totalHmm;
+        const w = h * imgRatio;
+        const cropX = (w - totalWmm) / 2;
+        return { x: -cropX, y: 0, w, h };
+      }
+
+      const w = totalWmm;
+      const h = w / imgRatio;
+      const cropY = (h - totalHmm) / 2;
+      return { x: 0, y: -cropY, w, h };
+    }
 
     if (imgRatio > posterRatio) {
       const w = totalWmm;
@@ -590,6 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
     usePrinterBorder.checked = state.usePrinterBorder;
     printerBorderCmIn.value = state.printerBorderCm;
     keepAsp.checked = state.keepAspect;
+    fillImage.checked = !!state.fillImage;
     alignIn.value = state.imageAlign;
     showG.checked = state.showGuides;
     styledG.checked = state.styledGuides;
@@ -605,6 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cPrev.height = 0;
     resLab.textContent = '—';
     updateAlignmentControl();
+    updateDimensionInputLocks();
     show(current);
   }
 
@@ -636,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
       usePrinterBorder.checked = !!state.usePrinterBorder;
       printerBorderCmIn.value = state.printerBorderCm;
       keepAsp.checked = !!state.keepAspect;
+      fillImage.checked = !!state.fillImage;
       alignIn.value = state.imageAlign;
       showG.checked = !!state.showGuides;
       styledG.checked = !!state.styledGuides;
@@ -736,6 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
     usePrinterBorder,
     printerBorderCmIn,
     keepAsp,
+    fillImage,
     alignIn,
     showG,
     styledG,
@@ -768,6 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         syncPagesFromTargetInputs();
       }
+      updateDimensionInputLocks();
     }
 
 
@@ -805,6 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   hydrateState();
+  updateDimensionInputLocks();
   if (lockTargetToPages.checked) {
     syncTargetInputsFromPages(getPosterGeometry());
   } else {
