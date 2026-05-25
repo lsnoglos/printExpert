@@ -70,6 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const openChk = document.getElementById('openPdf');
   const cPrev = document.getElementById('previewCanvas');
   const ctxP = cPrev.getContext('2d');
+  const quickPagesXIn = document.getElementById('quickPagesX');
+  const quickPagesYIn = document.getElementById('quickPagesY');
+  const quickGenerateBtn = document.getElementById('quickGenerateBtn');
 
   function setLoading(isLoading) {
     loadingOverlay.classList.toggle('visible', isLoading);
@@ -445,31 +448,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function toPixelBounds(startMm, sizeMm, mmToPx, maxPx) {
-    const start = Math.max(0, Math.min(maxPx, Math.round(startMm * mmToPx)));
-    const end = Math.max(start, Math.min(maxPx, Math.round((startMm + sizeMm) * mmToPx)));
-    return { start, size: Math.max(1, end - start) };
-  }
+  function drawTileFromSource(tileCtx, sxMm, syMm, sheetW, sheetH, blankLeftMm, blankTopMm, placement) {
+    const visibleStartX = sxMm + blankLeftMm;
+    const visibleStartY = syMm + blankTopMm;
+    const visibleWmm = sheetW - blankLeftMm;
+    const visibleHmm = sheetH - blankTopMm;
 
-  function createPosterRaster(totalWmm, totalHmm, placement) {
-    const posterPxWidth = Math.max(1, Math.ceil(totalWmm * 14));
-    const posterPxHeight = Math.max(1, Math.ceil(totalHmm * 14));
-    const canvas = document.createElement('canvas');
-    canvas.width = posterPxWidth;
-    canvas.height = posterPxHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, posterPxWidth, posterPxHeight);
+    const clipLeft = Math.max(visibleStartX, placement.x);
+    const clipTop = Math.max(visibleStartY, placement.y);
+    const clipRight = Math.min(visibleStartX + visibleWmm, placement.x + placement.w);
+    const clipBottom = Math.min(visibleStartY + visibleHmm, placement.y + placement.h);
 
-    ctx.drawImage(
+    if (clipRight <= clipLeft || clipBottom <= clipTop) return;
+
+    const srcX = ((clipLeft - placement.x) / placement.w) * img.naturalWidth;
+    const srcY = ((clipTop - placement.y) / placement.h) * img.naturalHeight;
+    const srcW = ((clipRight - clipLeft) / placement.w) * img.naturalWidth;
+    const srcH = ((clipBottom - clipTop) / placement.h) * img.naturalHeight;
+
+    const dstXmm = blankLeftMm + (clipLeft - visibleStartX);
+    const dstYmm = blankTopMm + (clipTop - visibleStartY);
+    const dstWmm = clipRight - clipLeft;
+    const dstHmm = clipBottom - clipTop;
+
+    tileCtx.drawImage(
       img,
-      (placement.x / totalWmm) * posterPxWidth,
-      (placement.y / totalHmm) * posterPxHeight,
-      (placement.w / totalWmm) * posterPxWidth,
-      (placement.h / totalHmm) * posterPxHeight
+      srcX,
+      srcY,
+      srcW,
+      srcH,
+      (dstXmm / sheetW) * tileCtx.canvas.width,
+      (dstYmm / sheetH) * tileCtx.canvas.height,
+      (dstWmm / sheetW) * tileCtx.canvas.width,
+      (dstHmm / sheetH) * tileCtx.canvas.height
     );
-
-    return canvas;
   }
 
   async function generatePoster() {
@@ -495,9 +507,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       const placement = getImagePlacement(totalWmm, totalHmm);
-      const posterCanvas = createPosterRaster(totalWmm, totalHmm, placement);
-      const mmToPxX = posterCanvas.width / totalWmm;
-      const mmToPxY = posterCanvas.height / totalHmm;
 
       let idx = 0;
       for (let y = 0; y < pagesY; y++) {
@@ -515,29 +524,14 @@ document.addEventListener('DOMContentLoaded', () => {
           const contentWmm = sheetW - blankLeftMm;
           const contentHmm = sheetH - blankTopMm;
 
-          const srcBoundsX = toPixelBounds(sx + blankLeftMm, contentWmm, mmToPxX, posterCanvas.width);
-          const srcBoundsY = toPixelBounds(sy + blankTopMm, contentHmm, mmToPxY, posterCanvas.height);
-
           const tileCanvas = document.createElement('canvas');
-          tileCanvas.width = Math.max(1, Math.ceil(sheetW * mmToPxX));
-          tileCanvas.height = Math.max(1, Math.ceil(sheetH * mmToPxY));
+          tileCanvas.width = Math.max(1, Math.ceil(sheetW * 12));
+          tileCanvas.height = Math.max(1, Math.ceil(sheetH * 12));
           const tileCtx = tileCanvas.getContext('2d');
           tileCtx.fillStyle = '#fff';
           tileCtx.fillRect(0, 0, tileCanvas.width, tileCanvas.height);
 
-          const dstBoundsX = toPixelBounds(blankLeftMm, contentWmm, mmToPxX, tileCanvas.width);
-          const dstBoundsY = toPixelBounds(blankTopMm, contentHmm, mmToPxY, tileCanvas.height);
-          tileCtx.drawImage(
-            posterCanvas,
-            srcBoundsX.start,
-            srcBoundsY.start,
-            srcBoundsX.size,
-            srcBoundsY.size,
-            dstBoundsX.start,
-            dstBoundsY.start,
-            dstBoundsX.size,
-            dstBoundsY.size
-          );
+          drawTileFromSource(tileCtx, sx, sy, sheetW, sheetH, blankLeftMm, blankTopMm, placement);
 
           const printAreaX = Math.min(printerBorderMm, sheetW / 2);
           const printAreaY = Math.min(printerBorderMm, sheetH / 2);
@@ -830,6 +824,28 @@ document.addEventListener('DOMContentLoaded', () => {
     drawPreview();
     saveState();
   });
+
+  async function quickGenerate() {
+    if (!img) return alert('Primero carga y recorta una imagen');
+    pagesX = Math.max(1, +quickPagesXIn.value || 1);
+    pagesY = Math.max(1, +quickPagesYIn.value || 1);
+    pXIn.value = pagesX;
+    pYIn.value = pagesY;
+
+    sheetSz.value = 'letter';
+    orient.value = 'portrait';
+    oW.value = '1';
+    oH.value = '1';
+    blankOverlap.checked = true;
+    lockTargetToPages.checked = true;
+    updateDimensionInputLocks();
+    syncTargetInputsFromPages(getPosterGeometry());
+    drawPreview();
+    saveState();
+    await generatePoster();
+  }
+
+  quickGenerateBtn.addEventListener('click', quickGenerate);
 
   newBtn.addEventListener('click', () => {
     if (hasSavedImageData()) {

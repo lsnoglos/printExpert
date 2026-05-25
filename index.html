@@ -32,6 +32,17 @@
           <label>Imagen de entrada:</label>
           <input type="file" id="imageInput" accept="image/*" />
         </div>
+        <fieldset>
+          <legend>Generación rápida</legend>
+          <div class="row-fields">
+            <label>Ancho (hojas) <input type="number" id="quickPagesX" value="1" min="1"/></label>
+            <label>Alto (hojas) <input type="number" id="quickPagesY" value="1" min="1"/></label>
+          </div>
+          <div class="form-group">
+            <button type="button" id="quickGenerateBtn">Generar rápido (Carta vertical)</button>
+          </div>
+        </fieldset>
+
         <div class="form-group">
           <label>Vista previa (recorta con el ratón):</label>
           <div class="crop-container">
