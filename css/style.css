@@ -282,3 +282,7 @@ canvas {
   main { padding: 20px; }
   .step { padding: 20px; }
 }
+
+#quickGenerateBtn {
+  background: linear-gradient(140deg, #0ea5a3 0%, #22c55e 100%);
+}
