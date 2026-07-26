@@ -521,11 +521,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const mr = Math.max(0, +mR.value * 10);
       const mb = Math.max(0, +mB.value * 10);
 
-      const pdf = new jsPDF({
-        unit: 'mm',
-        format: [sheetW, sheetH],
-        orientation: 'portrait'
-      });
+      const pdfOptions = { unit: 'mm' };
+      if (sheetSz.value === 'custom') {
+        pdfOptions.format = [sheetW, sheetH];
+        pdfOptions.orientation = 'portrait';
+      } else {
+        const baseSheet = sheets[sheetSz.value] || sheets.letter;
+        pdfOptions.format = [baseSheet.w, baseSheet.h];
+        pdfOptions.orientation = orient.value;
+      }
+
+      const pdf = new jsPDF(pdfOptions);
 
       const placement = getImagePlacement(totalWmm, totalHmm);
 
