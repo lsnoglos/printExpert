@@ -101,6 +101,17 @@ legend {
 
 .compact-checks { margin: 8px 0; }
 
+.help-text {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+
+.custom-sheet-fields[hidden] {
+  display: none;
+}
+
 input[type="file"],
 input[type="number"],
 select {

@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const imgPrev = document.getElementById('imgPreview');
   const cropBtn = document.getElementById('cropBtn');
   const sheetSz = document.getElementById('sheetSize');
+  const customSheetFields = document.getElementById('customSheetFields');
+  const customSheetWidthCmIn = document.getElementById('customSheetWidthCm');
+  const customSheetHeightCmIn = document.getElementById('customSheetHeightCm');
   const orient = document.getElementById('orientation');
   const mT = document.getElementById('marginTop');
   const mL = document.getElementById('marginLeft');
@@ -102,6 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
       current: 1,
       imageData: '',
       sheetSize: 'letter',
+      customSheetWidthCm: '21',
+      customSheetHeightCm: '90',
       orientation: 'portrait',
       marginTop: '0',
       marginLeft: '0',
@@ -133,6 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
       current,
       imageData: img ? img.src : '',
       sheetSize: sheetSz.value,
+      customSheetWidthCm: customSheetWidthCmIn.value,
+      customSheetHeightCm: customSheetHeightCmIn.value,
       orientation: orient.value,
       marginTop: mT.value,
       marginLeft: mL.value,
@@ -179,8 +186,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function getBaseSheetSizeMm() {
+    if (sheetSz.value === 'custom') {
+      const customW = Math.max(1, (+customSheetWidthCmIn.value || 0) * 10);
+      const customH = Math.max(1, (+customSheetHeightCmIn.value || 0) * 10);
+      return { w: customW, h: customH };
+    }
+
+    return sheets[sheetSz.value] || sheets.letter;
+  }
+
   function getSheetSizeMm() {
-    const { w: sw0, h: sh0 } = sheets[sheetSz.value];
+    const { w: sw0, h: sh0 } = getBaseSheetSizeMm();
     return orient.value === 'landscape' ? { sheetW: sh0, sheetH: sw0 } : { sheetW: sw0, sheetH: sh0 };
   }
 
@@ -237,6 +254,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateAlignmentControl() {
     alignLbl.textContent = 'Alineación de imagen:';
     alignGrp.style.display = keepAsp.checked ? '' : 'none';
+  }
+
+  function updateCustomSheetFields() {
+    customSheetFields.hidden = sheetSz.value !== 'custom';
   }
 
   function updateDimensionInputLocks() {
@@ -502,8 +523,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const pdf = new jsPDF({
         unit: 'mm',
-        format: [sheets[sheetSz.value].w, sheets[sheetSz.value].h],
-        orientation: orient.value
+        format: [sheetW, sheetH],
+        orientation: 'portrait'
       });
 
       const placement = getImagePlacement(totalWmm, totalHmm);
@@ -599,6 +620,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = getDefaultState();
     current = state.current;
     sheetSz.value = state.sheetSize;
+    customSheetWidthCmIn.value = state.customSheetWidthCm;
+    customSheetHeightCmIn.value = state.customSheetHeightCm;
     orient.value = state.orientation;
     mT.value = state.marginTop;
     mL.value = state.marginLeft;
@@ -632,6 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cPrev.height = 0;
     resLab.textContent = '—';
     updateAlignmentControl();
+    updateCustomSheetFields();
     updateDimensionInputLocks();
     show(current);
   }
@@ -646,7 +670,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const state = { ...getDefaultState(), ...JSON.parse(raw) };
       current = Math.min(TOTAL_STEPS, Math.max(1, +state.current || 1));
-      sheetSz.value = state.sheetSize;
+      sheetSz.value = sheets[state.sheetSize] || state.sheetSize === 'custom' ? state.sheetSize : 'letter';
+      customSheetWidthCmIn.value = state.customSheetWidthCm;
+      customSheetHeightCmIn.value = state.customSheetHeightCm;
       orient.value = state.orientation;
       mT.value = state.marginTop;
       mL.value = state.marginLeft;
@@ -749,6 +775,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const previewInputs = [
     sheetSz,
+    customSheetWidthCmIn,
+    customSheetHeightCmIn,
     orient,
     mT,
     mL,
@@ -806,7 +834,11 @@ document.addEventListener('DOMContentLoaded', () => {
       syncTargetInputsFromPages(getPosterGeometry());
     }
 
-    if (!lockTargetToPages.checked && [sheetSz, orient, oW, oH, usePrinterBorder, printerBorderCmIn].includes(e.target)) {
+    if (e.target === sheetSz) {
+      updateCustomSheetFields();
+    }
+
+    if (!lockTargetToPages.checked && [sheetSz, customSheetWidthCmIn, customSheetHeightCmIn, orient, oW, oH, usePrinterBorder, printerBorderCmIn].includes(e.target)) {
       syncPagesFromTargetInputs();
     }
 
@@ -833,6 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pYIn.value = pagesY;
 
     sheetSz.value = 'letter';
+    updateCustomSheetFields();
     orient.value = 'portrait';
     oW.value = '1';
     oH.value = '1';
@@ -858,6 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   hydrateState();
+  updateCustomSheetFields();
   updateDimensionInputLocks();
   if (lockTargetToPages.checked) {
     syncTargetInputsFromPages(getPosterGeometry());
